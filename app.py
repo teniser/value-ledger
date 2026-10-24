@@ -113,14 +113,6 @@ def parse_wallstreet(info, price):
     except Exception:
         return {"ws_score": 5.0, "rec": 0.0, "upside": 0.0, "num": 0, "target": 0.0}
 
-def get_wallstreet_sentiment(ticker):
-    try:
-        info = yf.Ticker(ticker).info
-        price = info.get("currentPrice") or info.get("regularMarketPrice") or 0.0
-        return parse_wallstreet(info, float(price) if price else 0.0)
-    except Exception:
-        return {"ws_score": 5.0, "rec": 0.0, "upside": 0.0, "num": 0, "target": 0.0}
-
 NY_TZ = pytz.timezone("America/New_York")
 LJ_TZ = pytz.timezone("Europe/Ljubljana")
 
@@ -159,7 +151,7 @@ def tactical_intraday_signal(df):
     elif vol_ratio<=0.8: score-=0.5
     if rel_open<-2.5: score-=0.75
     score = max(0.0,min(10.0,score))
-    return {"score":round(score,1),"last":round(last,2),"rel_vwap":round(rel_vwap,2),"momentum":round(momentum,2),"vol_ratio":round(vol_ratio,2)}
+    return {"score":round(score,1),"last":round(last,2),"rel_open":round(rel_open,2),"rel_vwap":round(rel_vwap,2),"momentum":round(momentum,2),"vol_ratio":round(vol_ratio,2)}
 
 def get_asymmetry_score(ticker):
     try:
@@ -195,7 +187,7 @@ def get_asymmetry_score(ticker):
         ws = parse_wallstreet(info, price_f)
         s = s * 0.7 + ws["ws_score"] * 0.3
         s = max(0.0, min(10.0, s))
-        return {"score": king_adjusted_score(round(s,1), ticker), "ps": round(float(ps),2), "peg": round(float(peg),2), "growth": round(float(gr)*100,1), "price": round(price_f,2), "net_cash": net_cash, "debt": debt, "fcf_m": round(float(fcf_m),1), "ws_score": ws["ws_score"], "ws_rec": ws["rec"], "ws_upside": ws["upside"], "ws_num": ws["num"], "ws_target": ws["target"]}
+        return {"score": king_adjusted_score(round(s,1), ticker), "ps": round(float(ps),2), "peg": round(float(peg),2), "growth": round(float(gr)*100,1), "price": round(price_f,2), "net_cash": net_cash, "debt": debt, "fcf_m": round(float(fcf_m),1), "ws_score": ws["ws_score"], "ws_rec": ws["rec"], "ws_upside": ws["upside"], "ws_num": ws["num"]}
     except Exception:
         return None
 
@@ -224,23 +216,18 @@ def scan_best_reversal():
         if sig is None:
             continue
         sig["score"] = king_adjusted_score(sig["score"], t)
-        if sig["rel_vwap"] < 0 or sig["vol_ratio"] < 1.2 or sig["momentum"] < 0:
+        if sig.get("rel_open", 0) > 4.0:
             continue
-        if sig["score"] < 7.0:
+        if not (-8.0 <= sig.get("rel_open", 0) <= -1.0):
             continue
-        if best is None or sig["score"] > best["signal"]["score"]:
-            best = {"ticker": t, "signal": sig}
-    return best
-
-def get_best_tactical_candidate(exclude_ticker=None):
-    best = None
-    for t in TICKERS_CONFIG.keys():
-        if t == exclude_ticker:
+        if sig.get("rel_vwap", 0) < -2.0:
             continue
-        sig = tactical_intraday_signal(get_intraday_df(t))
-        if sig is None:
+        if sig.get("vol_ratio", 0) < 1.3:
             continue
-        sig["score"] = king_adjusted_score(sig["score"], t)
+        if sig.get("momentum", 0) < 0:
+            continue
+        if sig["score"] < 6.0:
+            continue
         if best is None or sig["score"] > best["signal"]["score"]:
             best = {"ticker": t, "signal": sig}
     return best
@@ -256,8 +243,7 @@ def get_evening_decision(held_ticker):
         action = "DELNO ZMANJSAJ / OPREZ"
     else:
         action = "PRODAJ PRED ZAPRTJEM"
-    best = get_best_tactical_candidate(exclude_ticker=held_ticker)
-    return {"action": action, "best": best, "held": held_sig}
+    return {"action": action, "best": None, "held": held_sig}
 
 def is_preclose_window(now_ny=None):
     if now_ny is None:
@@ -284,14 +270,14 @@ if regime_txt == "RISK-OFF":
 bestL = scan_best_long()
 bestR = scan_best_reversal()
 if bestL is not None:
-    l_txt = str(bestL["ticker"]) + " " + str(bestL["signal"]["score"]) + "/10 P/S " + str(bestL["signal"]["ps"]) + " PEG " + str(bestL["signal"]["peg"]) + " WS " + str(bestL["signal"]["ws_score"]) + "/10 rec " + str(bestL["signal"]["ws_rec"])
+    l_txt = str(bestL["ticker"]) + " " + str(bestL["signal"]["score"]) + "/10 P/S " + str(bestL["signal"]["ps"]) + " PEG " + str(bestL["signal"]["peg"]) + " WS " + str(bestL["signal"]["ws_score"]) + "/10"
 else:
     l_txt = "NI STROGEGA KANDIDATA"
 if bestR is not None:
-    r_txt = str(bestR["ticker"]) + " " + str(bestR["signal"]["score"]) + "/10 $" + str(bestR["signal"]["last"])
+    r_txt = str(bestR["ticker"]) + " " + str(bestR["signal"]["score"]) + "/10 $" + str(bestR["signal"]["last"]) + " open " + str(bestR["signal"]["rel_open"]) + "%"
 else:
-    r_txt = "NI STROGEGA KANDIDATA"
-auto_banner = '<div class="preclose-banner"><div style="font-weight:700;color:#FEE2E2;">BEST LONG: ' + l_txt + '</div><div style="font-weight:700;color:#FEE2E2;margin-top:6px;">BEST OBRAT: ' + r_txt + '</div><div style="color:#FCA5A5;font-size:0.82rem;margin-top:6px;">Trg: ' + str(regime_txt) + ' WS sentiment + makro v metascore | auto ob refreshu</div></div>'
+    r_txt = "NI STROGEGA KANDIDATA - ni dipa pred obratom"
+auto_banner = '<div class="preclose-banner"><div style="font-weight:700;color:#FEE2E2;">BEST LONG: ' + l_txt + '</div><div style="font-weight:700;color:#FEE2E2;margin-top:6px;">BEST OBRAT DIP: ' + r_txt + '</div><div style="color:#FCA5A5;font-size:0.82rem;margin-top:6px;">Trg: ' + str(regime_txt) + ' WS + makro v LONG | dip filter v OBRAT | auto ob refreshu</div></div>'
 st.markdown(auto_banner, unsafe_allow_html=True)
 
 evening = get_evening_decision(held_ticker)
@@ -344,7 +330,7 @@ if st.button("POZENI AVTONOMNI AI PREGLED TRGA"):
         st.error("Vnesite Gemini API kljuc.")
     else:
         with st.spinner("Povezovanje z Gemini AI..."):
-            prompt_text = "Ti si analitik Value Ledger 2.0. Cene: " + str(data) + " Trg: " + str(regime_txt) + " BEST LONG: " + l_txt + " BEST OBRAT: " + r_txt + ". Pripravi porocilo v slovenscini z ocenami 1-10."
+            prompt_text = "Ti si analitik Value Ledger 2.0. Cene: " + str(data) + " Trg: " + str(regime_txt) + " BEST LONG: " + l_txt + " BEST OBRAT DIP: " + r_txt + ". Pripravi porocilo v slovenscini z ocenami 1-10."
             clean_key = api_key.strip()
             payload = {"contents": [{"parts": [{"text": prompt_text}]}]}
             success = False
