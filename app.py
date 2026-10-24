@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, time
 import pytz
 
 # --- NASTAVITEV STRANI ---
@@ -140,6 +140,43 @@ div.stButton > button:hover {
     transform: translateY(-1px) !important;
     box-shadow: 0 6px 24px rgba(245, 158, 11, 0.4) !important;
 }
+
+/* ALERT BANNER */
+.preclose-banner {
+    background: linear-gradient(135deg, rgba(127, 29, 29, 0.92) 0%, rgba(69, 10, 10, 0.96) 100%);
+    border: 1px solid rgba(248, 113, 113, 0.55);
+    border-radius: 18px;
+    padding: 18px 20px;
+    margin: 16px 0 22px 0;
+    box-shadow: 0 0 28px rgba(239, 68, 68, 0.14);
+}
+.preclose-banner .title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: #FEE2E2;
+    letter-spacing: 0.3px;
+}
+.preclose-banner .sub {
+    margin-top: 5px;
+    color: #FCA5A5;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+.preclose-banner .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    background: rgba(0, 0, 0, 0.18);
+    color: #FEE2E2;
+    font-size: 0.74rem;
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0.4px;
+}
 </style>""", unsafe_allow_html=True)
 
 # --- VNOS API KLJUČA ---
@@ -219,8 +256,177 @@ def get_live_data():
 
 data = get_live_data()
 
+# --- KORISTNE FUNKCIJE ZA VEČERNI SIGNAL ---
+NY_TZ = pytz.timezone("America/New_York")
+LJ_TZ = pytz.timezone("Europe/Ljubljana")
+
+def get_intraday_df(ticker, period="1d", interval="5m"):
+    try:
+        df = yf.Ticker(ticker).history(period=period, interval=interval, auto_adjust=False)
+        if df is None or df.empty:
+            return None
+        df = df.dropna(subset=["Open", "High", "Low", "Close", "Volume"])
+        return df
+    except:
+        return None
+
+def tactical_intraday_signal(df):
+    if df is None or len(df) < 12:
+        return None
+
+    close = df["Close"].astype(float)
+    volume = df["Volume"].replace(0, pd.NA).ffill().fillna(0).astype(float)
+
+    last = float(close.iloc[-1])
+    prev = float(close.iloc[-2])
+    day_open = float(df["Open"].iloc[0])
+
+    vol_sum = float(volume.cumsum().iloc[-1])
+    vwap = float(((close * volume).cumsum().iloc[-1] / vol_sum)) if vol_sum else last
+
+    ema9 = float(close.ewm(span=9, adjust=False).mean().iloc[-1])
+    ema20 = float(close.ewm(span=20, adjust=False).mean().iloc[-1])
+
+    avg_vol20 = float(volume.tail(20).mean()) if len(volume) >= 20 else float(volume.mean())
+    last_vol = float(volume.iloc[-1]) if len(volume) else 0.0
+    vol_ratio = (last_vol / avg_vol20) if avg_vol20 else 1.0
+
+    prev_series = close.shift(1)
+    prev_close = float(prev_series.iloc[-1]) if len(close) > 1 and pd.notna(prev_series.iloc[-1]) else None
+    gap = (((day_open / prev_close) - 1) * 100) if prev_close else 0.0
+
+    rel_open = ((last / day_open) - 1) * 100 if day_open else 0.0
+    rel_vwap = ((last / vwap) - 1) * 100 if vwap else 0.0
+    momentum = ((last / prev) - 1) * 100 if prev else 0.0
+
+    score = 5.0
+    score += max(min(rel_vwap * 0.8, 2.0), -2.0)
+    score += 1.0 if ema9 > ema20 else -1.0
+    score += max(min(momentum * 2.0, 1.0), -1.0)
+
+    if vol_ratio >= 1.2:
+        score += 1.0
+    elif vol_ratio <= 0.8:
+        score -= 0.5
+
+    if rel_open < -2.5:
+        score -= 0.75
+
+    if abs(gap) > 4.0:
+        score -= 0.5
+
+    score = max(0.0, min(10.0, score))
+
+    return {
+        "score": round(score, 1),
+        "last": round(last, 2),
+        "rel_open": round(rel_open, 2),
+        "rel_vwap": round(rel_vwap, 2),
+        "momentum": round(momentum, 2),
+        "vol_ratio": round(vol_ratio, 2),
+        "ema9": round(ema9, 2),
+        "ema20": round(ema20, 2),
+        "vwap": round(vwap, 2),
+        "gap": round(gap, 2),
+    }
+
+def get_best_tactical_candidate(exclude_ticker=None):
+    best = None
+
+    for t in TICKERS_CONFIG.keys():
+        if t == exclude_ticker:
+            continue
+
+        df = get_intraday_df(t)
+        sig = tactical_intraday_signal(df)
+
+        if sig is None:
+            continue
+
+        if best is None or sig["score"] > best["signal"]["score"]:
+            best = {"ticker": t, "signal": sig}
+
+    return best
+
+def get_evening_decision(held_ticker):
+    held_df = get_intraday_df(held_ticker)
+    held_sig = tactical_intraday_signal(held_df)
+
+    if held_sig is None:
+        return {
+            "action": "NI PODATKOV",
+            "reason": "Za ta ticker danes ni dovolj intraday podatkov za zanesljiv večerni signal.",
+            "best": None,
+            "held": None
+        }
+
+    if held_sig["score"] >= 7.0:
+        action = "DRŽI ČEZ NOČ"
+    elif held_sig["score"] >= 6.0:
+        action = "DELNO ZMANJŠAJ / OPREZ"
+    else:
+        action = "PRODAJ PRED ZAPRTJEM"
+
+    best = get_best_tactical_candidate(exclude_ticker=held_ticker)
+
+    rotation_text = "Boljši taktični obrat trenutno ni jasen."
+    if best and best["signal"]["score"] >= held_sig["score"] + 0.5 and best["signal"]["score"] >= 7.0:
+        rotation_text = (
+            f"Boljši taktični obrat je na voljo: {best['ticker']} "
+            f"({best['signal']['score']}/10) je močnejši od {held_ticker} "
+            f"({held_sig['score']}/10)."
+        )
+
+    return {
+        "action": action,
+        "reason": rotation_text,
+        "best": best,
+        "held": held_sig
+    }
+
+def is_preclose_window(now_ny=None):
+    now_ny = now_ny or datetime.now(NY_TZ)
+    if now_ny.weekday() >= 5:
+        return False
+    start = time(15, 30)
+    end = time(16, 0)
+    return start <= now_ny.time() < end
+
+def build_preclose_banner(held_ticker, evening):
+    held = evening["held"]
+    best = evening["best"]
+
+    if held is None:
+        return None
+
+    action_color = "#10B981" if evening["action"] == "DRŽI ČEZ NOČ" else ("#F59E0B" if evening["action"] == "DELNO ZMANJŠAJ / OPREZ" else "#EF4444")
+    action_text = evening["action"]
+
+    best_line = "Ni močnejše rotacije."
+    if best is not None:
+        best_line = f"Najboljša alternativa zdaj: {best['ticker']} · {best['signal']['score']}/10"
+
+    return f"""
+    <div class="preclose-banner">
+        <div class="title">⚠️ Pred-zapiralni alert za {held_ticker}</div>
+        <div class="sub">
+            Trg se bliža zaprtju. Sistem je preveril trenutno pozicijo in ob osvežitvi prebral intraday signal.
+        </div>
+        <div class="pill">ODLOČITEV: <span style="color:{action_color};font-weight:700;">{action_text}</span></div>
+        <div class="sub" style="margin-top:10px;">
+            <strong>Ocena:</strong> {held["score"]}/10 ·
+            <strong>Cena:</strong> ${held["last"]} ·
+            <strong>VWAP razmik:</strong> {held["rel_vwap"]}% ·
+            <strong>Momentum:</strong> {held["momentum"]}% ·
+            <strong>Volumen:</strong> {held["vol_ratio"]}x
+            <br>
+            <strong>Rotacija:</strong> {best_line}
+        </div>
+    </div>
+    """
+
 # --- GLAVA TERMINALA ---
-lj_time = datetime.now(pytz.timezone("Europe/Ljubljana")).strftime("%d.%m.%Y · %H:%M CET")
+lj_time = datetime.now(LJ_TZ).strftime("%d.%m.%Y · %H:%M CET")
 
 header_html = f"""<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:14px;margin-bottom:20px;">
 <div>
@@ -240,6 +446,23 @@ Sentiment Obrata × Makro Zaščita × Temelji × Podcenjenost · Kvantitativni 
 </div>
 </div>"""
 st.markdown(header_html, unsafe_allow_html=True)
+
+# --- SIDEBAR: KATERA POZICIJA JE POD NADZOROM ---
+st.sidebar.markdown("### 🌙 Večerni taktični pregled")
+held_ticker = st.sidebar.selectbox(
+    "Katera delnica je trenutno v poziciji?",
+    options=list(TICKERS_CONFIG.keys()),
+    index=list(TICKERS_CONFIG.keys()).index("CRWD")
+)
+
+st.sidebar.caption("Banner se sam pokaže v zadnjih 30 minutah pred zaprtjem trga ob osvežitvi strani.")
+
+# --- PRE-CLOSE ALERT BANNER ---
+evening = get_evening_decision(held_ticker)
+if is_preclose_window():
+    banner_html = build_preclose_banner(held_ticker, evening)
+    if banner_html:
+        st.markdown(banner_html, unsafe_allow_html=True)
 
 # --- 1. KARTICA: MNDY #1 ASIMETRIČNI VODITELJ ---
 mndy_live = data.get("MNDY", {"price": 106.86, "chg": 0.0, "ps": 3.3})
