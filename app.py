@@ -16,129 +16,119 @@ st.set_page_config(
 )
 
 # --- LUXURY OLED OBSIDIAN & GLASSMORPHISM STIL ---
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+st.markdown("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
 
-    /* Glavno ozadje */
-    html, body, [class*="css"], .stApp {
-        background-color: #050508 !important;
-        font-family: 'Inter', sans-serif !important;
-        color: #F3F4F6 !important;
-    }
+html, body, [class*="css"], .stApp {
+    background-color: #050508 !important;
+    font-family: 'Inter', sans-serif !important;
+    color: #F3F4F6 !important;
+}
 
-    /* Stranska vrstica */
-    section[data-testid="stSidebar"] {
-        background-color: #090D16 !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
-    }
+section[data-testid="stSidebar"] {
+    background-color: #090D16 !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
 
-    /* Kartice Glassmorphism */
-    .ledger-card {
-        background: linear-gradient(135deg, rgba(17, 24, 39, 0.75) 0%, rgba(9, 13, 22, 0.9) 100%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 22px;
-        box-shadow: 0 14px 35px rgba(0, 0, 0, 0.65);
-        backdrop-filter: blur(14px);
-    }
+.ledger-card {
+    background: linear-gradient(135deg, rgba(17, 24, 39, 0.75) 0%, rgba(9, 13, 22, 0.9) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 22px;
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(14px);
+}
 
-    /* Zlata dihajoča obroba za MNDY #1 Asimetrijo */
-    .mndy-hero-card {
-        background: linear-gradient(135deg, rgba(24, 20, 10, 0.85) 0%, rgba(12, 10, 6, 0.95) 100%);
-        border: 2px solid #F59E0B;
-        border-radius: 18px;
-        padding: 26px;
-        margin-bottom: 24px;
-        box-shadow: 0 0 25px rgba(245, 158, 11, 0.25);
-        animation: pulseGold 3s infinite ease-in-out;
-    }
+.mndy-hero-card {
+    background: linear-gradient(135deg, rgba(24, 20, 10, 0.85) 0%, rgba(12, 10, 6, 0.95) 100%);
+    border: 2px solid #F59E0B;
+    border-radius: 18px;
+    padding: 26px;
+    margin-bottom: 24px;
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.25);
+    animation: pulseGold 3s infinite ease-in-out;
+}
 
-    @keyframes pulseGold {
-        0%, 100% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.7); }
-        50% { box-shadow: 0 0 32px rgba(245, 158, 11, 0.5); border-color: #FBBF24; }
-    }
+@keyframes pulseGold {
+    0%, 100% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.7); }
+    50% { box-shadow: 0 0 32px rgba(245, 158, 11, 0.5); border-color: #FBBF24; }
+}
 
-    /* Transparentna A+ Značka z zlato dihajočo obrobo */
-    .aplus-badge {
-        display: inline-block;
-        background: transparent !important;
-        border: 1.8px solid #F59E0B;
-        color: #FBBF24;
-        font-family: 'JetBrains Mono', monospace;
-        font-weight: 700;
-        font-size: 0.8rem;
-        padding: 4px 14px;
-        border-radius: 9999px;
-        box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
-        animation: pulseGoldBadge 2.2s infinite ease-in-out;
-        letter-spacing: 0.5px;
-    }
+.aplus-badge {
+    display: inline-block;
+    background: transparent !important;
+    border: 1.8px solid #F59E0B;
+    color: #FBBF24;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 4px 14px;
+    border-radius: 9999px;
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
+    animation: pulseGoldBadge 2.2s infinite ease-in-out;
+    letter-spacing: 0.5px;
+}
 
-    @keyframes pulseGoldBadge {
-        0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.25); border-color: #F59E0B; }
-        50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.7); border-color: #FDE68A; }
-    }
+@keyframes pulseGoldBadge {
+    0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.25); border-color: #F59E0B; }
+    50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.7); border-color: #FDE68A; }
+}
 
-    /* Značke sektorjev */
-    .badge-sector {
-        font-size: 0.72rem;
-        font-weight: 600;
-        padding: 3px 8px;
-        border-radius: 6px;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        color: #9CA3AF;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
+.badge-sector {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #9CA3AF;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
 
-    /* Mreža kazalnikov */
-    .metrics-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 12px;
-        margin: 16px 0;
-        padding: 14px;
-        background: rgba(0, 0, 0, 0.35);
-        border-radius: 12px;
-    }
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+    padding: 14px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 12px;
+}
 
-    .metric-label {
-        color: #9CA3AF;
-        font-size: 0.72rem;
-        margin-bottom: 2px;
-        text-transform: uppercase;
-    }
+.metric-label {
+    color: #9CA3AF;
+    font-size: 0.72rem;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+}
 
-    .metric-value {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #FFFFFF;
-    }
+.metric-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #FFFFFF;
+}
 
-    /* Gumbi */
-    div.stButton > button {
-        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
-        color: #000000 !important;
-        font-weight: 700 !important;
-        font-family: 'JetBrains Mono', monospace !important;
-        border: none !important;
-        border-radius: 10px !important;
-        padding: 12px 24px !important;
-        font-size: 0.95rem !important;
-        box-shadow: 0 4px 18px rgba(245, 158, 11, 0.3) !important;
-        transition: all 0.2s ease-in-out !important;
-    }
+div.stButton > button {
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 12px 24px !important;
+    font-size: 0.95rem !important;
+    box-shadow: 0 4px 18px rgba(245, 158, 11, 0.3) !important;
+    transition: all 0.2s ease-in-out !important;
+}
 
-    div.stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5) !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+div.stButton > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5) !important;
+}
+</style>""", unsafe_allow_html=True)
 
 # --- VNOS API KLJUČA ---
 st.sidebar.markdown("### 🔑 Google AI Nastavitev")
@@ -220,104 +210,97 @@ data = get_live_data()
 # --- GLAVA TERMINALA ---
 lj_time = datetime.now(pytz.timezone("Europe/Ljubljana")).strftime("%d.%m.%Y · %H:%M CET")
 
-st.markdown(f"""
-<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px; margin-bottom: 22px;">
-    <div>
-        <h1 style="margin: 0; font-size: 1.95rem; font-weight: 800; letter-spacing: -0.5px;">
-            <span style="color: #F59E0B;">THE VALUE LEDGER</span> <span style="color: #60A5FA;">2.0</span>
-        </h1>
-        <p style="margin: 4px 0 0 0; color: #9CA3AF; font-size: 0.85rem;">
-            Sentiment Obrata × Makro Zaščita × Temelji × Podcenjenost · Osebni Kvantitativni Terminal
-        </p>
-    </div>
-    <div style="text-align: right;">
-        <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 5px 12px; border-radius: 9999px;">
-            <span style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; box-shadow: 0 0 10px #10B981;"></span>
-            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #10B981; font-weight: 700;">ŽIVI BORZNI RADAR AKTIVEN</span>
-        </div>
-        <div style="font-size: 0.72rem; color: #6B7280; font-family: 'JetBrains Mono', monospace; margin-top: 4px;">{lj_time}</div>
-    </div>
+header_html = f"""<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:16px;margin-bottom:22px;">
+<div>
+<h1 style="margin:0;font-size:1.95rem;font-weight:800;letter-spacing:-0.5px;">
+<span style="color:#F59E0B;">THE VALUE LEDGER</span> <span style="color:#60A5FA;">2.0</span>
+</h1>
+<p style="margin:4px 0 0 0;color:#9CA3AF;font-size:0.85rem;">
+Sentiment Obrata × Makro Zaščita × Temelji × Podcenjenost · Osebni Kvantitativni Terminal
+</p>
 </div>
-""", unsafe_allow_html=True)
+<div style="text-align:right;">
+<div style="display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:5px 12px;border-radius:9999px;">
+<span style="width:8px;height:8px;background:#10B981;border-radius:50%;box-shadow:0 0 10px #10B981;"></span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#10B981;font-weight:700;">ŽIVI BORZNI RADAR AKTIVEN</span>
+</div>
+<div style="font-size:0.72rem;color:#6B7280;font-family:'JetBrains Mono',monospace;margin-top:4px;">{lj_time}</div>
+</div>
+</div>"""
+st.markdown(header_html, unsafe_allow_html=True)
 
 # --- 1. KARTICA: MNDY #1 ASIMETRIČNI VODITELJ ---
 mndy_live = data.get("MNDY", {"price": 106.86, "chg": 0.0, "ps": 3.3})
 m_col = "#10B981" if mndy_live["chg"] >= 0 else "#EF4444"
 m_sign = "+" if mndy_live["chg"] >= 0 else ""
 
-st.markdown(f"""
-<div class="mndy-hero-card">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-        <div>
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                <span style="font-family: 'JetBrains Mono', monospace; font-size: 1.45rem; font-weight: 800; color: #FFFFFF;">MNDY</span>
-                <span class="badge-sector">SaaS / Work OS</span>
-                <span style="background: rgba(245, 158, 11, 0.2); border: 1px solid #F59E0B; color: #FBBF24; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;">💎 #1 ASIMETRIČNA GLAVNA NALOŽBA</span>
-            </div>
-            <div style="color: #9CA3AF; font-size: 0.9rem;">monday.com Ltd. · Glavna Trdnjava Portfelja (+200 % Potencial do 320 $+)</div>
-        </div>
-        <div style="text-align: right;">
-            <div style="font-size: 1.85rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: #FFFFFF;">
-                ${mndy_live['price']} <span style="font-size: 1rem; color: {m_col};">{m_sign}{mndy_live['chg']}%</span>
-            </div>
-            <div style="color: #F59E0B; font-weight: 700; font-family: 'JetBrains Mono', monospace;">Ocena Asimetrije: 9.4 / 10</div>
-        </div>
-    </div>
-
-    <div class="metrics-grid">
-        <div><div class="metric-label">P/S Multiplikator</div><div class="metric-value" style="color: #60A5FA;">{mndy_live['ps']}x (EV/S 1.9x)</div></div>
-        <div><div class="metric-label">PEG Razmerje</div><div class="metric-value" style="color: #10B981;">0.62 (Ekstremno poceni)</div></div>
-        <div><div class="metric-label">Rast Prihodkov</div><div class="metric-value" style="color: #10B981;">+24.2% YoY</div></div>
-        <div><div class="metric-label">Prosti Denar (FCF)</div><div class="metric-value" style="color: #10B981;">21.8% marža</div></div>
-        <div><div class="metric-label">Rule of 40</div><div class="metric-value" style="color: #10B981;">46% (Elitno)</div></div>
-        <div><div class="metric-label">Gotovina / Dolg</div><div class="metric-value" style="color: #FBBF24;">>1.66B $ (0 dolga)</div></div>
-    </div>
-
-    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(245, 158, 11, 0.2); padding-top: 12px; font-size: 0.85rem; flex-wrap: wrap; gap: 8px;">
-        <span style="color: #D1D5DB;"><strong>Status:</strong> 🟢 Akumuliraj in mirno drži do ciljnih stopenj.</span>
-        <span style="color: #9CA3AF; font-family: 'JetBrains Mono', monospace;">1. Tarča: $230 (5.5x) · 2. Tarča: $290 (7.5x) · 3. Tarča: $350+ (8.5x+)</span>
-    </div>
+mndy_card_html = f"""<div class="mndy-hero-card">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+<div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+<span style="font-family:'JetBrains Mono',monospace;font-size:1.45rem;font-weight:800;color:#FFFFFF;">MNDY</span>
+<span class="badge-sector">SaaS / Work OS</span>
+<span style="background:rgba(245,158,11,0.2);border:1px solid #F59E0B;color:#FBBF24;font-size:0.72rem;font-weight:700;padding:3px 8px;border-radius:6px;">💎 #1 ASIMETRIČNA GLAVNA NALOŽBA</span>
 </div>
-""", unsafe_allow_html=True)
+<div style="color:#9CA3AF;font-size:0.9rem;">monday.com Ltd. · Glavna Trdnjava Portfelja (+200 % Potencial do 320 $+)</div>
+</div>
+<div style="text-align:right;">
+<div style="font-size:1.85rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#FFFFFF;">
+${mndy_live['price']} <span style="font-size:1rem;color:{m_col};">{m_sign}{mndy_live['chg']}%</span>
+</div>
+<div style="color:#F59E0B;font-weight:700;font-family:'JetBrains Mono',monospace;">Ocena Asimetrije: 9.4 / 10</div>
+</div>
+</div>
+<div class="metrics-grid">
+<div><div class="metric-label">P/S Multiplikator</div><div class="metric-value" style="color:#60A5FA;">{mndy_live['ps']}x (EV/S 1.9x)</div></div>
+<div><div class="metric-label">PEG Razmerje</div><div class="metric-value" style="color:#10B981;">0.62 (Ekstremno poceni)</div></div>
+<div><div class="metric-label">Rast Prihodkov</div><div class="metric-value" style="color:#10B981;">+24.2% YoY</div></div>
+<div><div class="metric-label">Prosti Denar (FCF)</div><div class="metric-value" style="color:#10B981;">21.8% marža</div></div>
+<div><div class="metric-label">Rule of 40</div><div class="metric-value" style="color:#10B981;">46% (Elitno)</div></div>
+<div><div class="metric-label">Gotovina / Dolg</div><div class="metric-value" style="color:#FBBF24;">>1.66B $ (0 dolga)</div></div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(245,158,11,0.2);padding-top:12px;font-size:0.85rem;flex-wrap:wrap;gap:8px;">
+<span style="color:#D1D5DB;"><strong>Status:</strong> 🟢 Akumuliraj in mirno drži do ciljnih stopenj.</span>
+<span style="color:#9CA3AF;font-family:'JetBrains Mono',monospace;">1. Tarča: $230 (5.5x) · 2. Tarča: $290 (7.5x) · 3. Tarča: $350+ (8.5x+)</span>
+</div>
+</div>"""
+st.markdown(mndy_card_html, unsafe_allow_html=True)
 
 # --- 2. KARTICA: CRWD #1 TAKTIČNI A+ OBRAT ---
 crwd_live = data.get("CRWD", {"price": 325.0, "chg": 0.0, "ps": 17.0})
 c_col = "#10B981" if crwd_live["chg"] >= 0 else "#EF4444"
 c_sign = "+" if crwd_live["chg"] >= 0 else ""
 
-st.markdown(f"""
-<div class="ledger-card">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-        <div>
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                <span style="font-family: 'JetBrains Mono', monospace; font-size: 1.35rem; font-weight: 800; color: #FFFFFF;">CRWD</span>
-                <span class="badge-sector">Kibernetska varnost</span>
-                <div class="aplus-badge">🌟 A+ SETUP</div>
-            </div>
-            <div style="color: #9CA3AF; font-size: 0.85rem;">CrowdStrike · Edini potrjeni taktični obrat dneva (Absorpcija panike & Short Squeeze)</div>
-        </div>
-        <div style="text-align: right;">
-            <div style="font-size: 1.65rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: #FFFFFF;">
-                ${crwd_live['price']} <span style="font-size: 0.95rem; color: {c_col};">{c_sign}{crwd_live['chg']}%</span>
-            </div>
-            <div style="color: #10B981; font-weight: 700; font-family: 'JetBrains Mono', monospace;">Ocena Obrata: 9.5 / 10</div>
-        </div>
-    </div>
-
-    <div class="metrics-grid">
-        <div><div class="metric-label">P/S Multiplikator</div><div class="metric-value">{crwd_live['ps']}x</div></div>
-        <div><div class="metric-label">PEG Razmerje</div><div class="metric-value">1.80</div></div>
-        <div><div class="metric-label">Rast Prihodkov</div><div class="metric-value" style="color: #10B981;">+28% YoY</div></div>
-        <div><div class="metric-label">Rule of 40</div><div class="metric-value" style="color: #10B981;">60%</div></div>
-        <div><div class="metric-label">Zadržanje Strank</div><div class="metric-value" style="color: #10B981;">>97%</div></div>
-        <div><div class="metric-label">Premarket Skok</div><div class="metric-value" style="color: #10B981;">+0.4% → +8.2%</div></div>
-    </div>
-
-    <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 10px; font-size: 0.8rem; color: #9CA3AF;">
-        <strong>Trgovalno pravilo:</strong> Vstop v premarketu / ob odprtju · Izstop ob dosegu +5 % do +8 %+ pred zaprtjem ob 21:00 CET.
-    </div>
+crwd_card_html = f"""<div class="ledger-card">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+<div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+<span style="font-family:'JetBrains Mono',monospace;font-size:1.35rem;font-weight:800;color:#FFFFFF;">CRWD</span>
+<span class="badge-sector">Kibernetska varnost</span>
+<div class="aplus-badge">🌟 A+ SETUP</div>
 </div>
-""", unsafe_allow_html=True)
+<div style="color:#9CA3AF;font-size:0.85rem;">CrowdStrike · Edini potrjeni taktični obrat dneva (Absorpcija panike & Short Squeeze)</div>
+</div>
+<div style="text-align:right;">
+<div style="font-size:1.65rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#FFFFFF;">
+${crwd_live['price']} <span style="font-size:0.95rem;color:{c_col};">{c_sign}{crwd_live['chg']}%</span>
+</div>
+<div style="color:#10B981;font-weight:700;font-family:'JetBrains Mono',monospace;">Ocena Obrata: 9.5 / 10</div>
+</div>
+</div>
+<div class="metrics-grid">
+<div><div class="metric-label">P/S Multiplikator</div><div class="metric-value">{crwd_live['ps']}x</div></div>
+<div><div class="metric-label">PEG Razmerje</div><div class="metric-value">1.80</div></div>
+<div><div class="metric-label">Rast Prihodkov</div><div class="metric-value" style="color:#10B981;">+28% YoY</div></div>
+<div><div class="metric-label">Rule of 40</div><div class="metric-value" style="color:#10B981;">60%</div></div>
+<div><div class="metric-label">Zadržanje Strank</div><div class="metric-value" style="color:#10B981;">>97%</div></div>
+<div><div class="metric-label">Premarket Skok</div><div class="metric-value" style="color:#10B981;">+0.4% → +8.2%</div></div>
+</div>
+<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;font-size:0.8rem;color:#9CA3AF;">
+<strong>Trgovalno pravilo:</strong> Vstop v premarketu / ob odprtju · Izstop ob dosegu +5 % do +8 %+ pred zaprtjem ob 21:00 CET.
+</div>
+</div>"""
+st.markdown(crwd_card_html, unsafe_allow_html=True)
 
 # --- 3. DVOJNI POGLED: RADAR & TABELA 9 DELNIC ---
 col_radar, col_table = st.columns([1, 1.25])
@@ -381,29 +364,25 @@ st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 col_rot, col_exit = st.columns(2)
 
 with col_rot:
-    st.markdown("""
-    <div class="ledger-card">
-        <h4 style="margin: 0 0 8px 0; color: #10B981; font-size: 1rem;">🔄 Capital Rotation Radar (Signal za Rotacijo)</h4>
-        <p style="font-size: 0.85rem; color: #9CA3AF; margin-bottom: 12px;">
-            Sistem nenehno preverja, ali se na trgu pojavi naložba z večjo asimetrijo od MNDY.
-        </p>
-        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10B981; border-radius: 8px; padding: 12px; font-size: 0.85rem; color: #6EE7B7;">
-            <strong>🟢 TRENUTNI STATUS:</strong> MNDY ostaja trdna #1 izbira (Ocena 9.4). Ni potrebe po rotaciji kapitala.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("""<div class="ledger-card">
+<h4 style="margin:0 0 8px 0;color:#10B981;font-size:1rem;">🔄 Capital Rotation Radar (Signal za Rotacijo)</h4>
+<p style="font-size:0.85rem;color:#9CA3AF;margin-bottom:12px;">
+Sistem nenehno preverja, ali se na trgu pojavi naložba z večjo asimetrijo od MNDY.
+</p>
+<div style="background:rgba(16,185,129,0.1);border:1px solid #10B981;border-radius:8px;padding:12px;font-size:0.85rem;color:#6EE7B7;">
+<strong>🟢 TRENUTNI STATUS:</strong> MNDY ostaja trdna #1 izbira (Ocena 9.4). Ni potrebe po rotaciji kapitala.
+</div>
+</div>""", unsafe_allow_html=True)
 
 with col_exit:
-    st.markdown("""
-    <div class="ledger-card">
-        <h4 style="margin: 0 0 8px 0; color: #F59E0B; font-size: 1rem;">🎯 MNDY Stopnje za Zaklep Dobička</h4>
-        <div style="font-size: 0.85rem; color: #D1D5DB; line-height: 1.7;">
-            <div><strong>1. Tarča ($220–$240 · P/S ~5.5x):</strong> Prodaj 20–25 % (Izplačilo vložka / Risk-Free).</div>
-            <div><strong>2. Tarča ($280–$310 · P/S ~7.5x):</strong> Prodaj 50 % preostanka (Zaklep glavnine dobička).</div>
-            <div><strong>3. Tarča (>$340–$380 · P/S >8.5x):</strong> 🚨 Popolna prodaja ob evforiji.</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("""<div class="ledger-card">
+<h4 style="margin:0 0 8px 0;color:#F59E0B;font-size:1rem;">🎯 MNDY Stopnje za Zaklep Dobička</h4>
+<div style="font-size:0.85rem;color:#D1D5DB;line-height:1.7;">
+<div><strong>1. Tarča ($220–$240 · P/S ~5.5x):</strong> Prodaj 20–25 % (Izplačilo vložka / Risk-Free).</div>
+<div><strong>2. Tarča ($280–$310 · P/S ~7.5x):</strong> Prodaj 50 % preostanka (Zaklep glavnine dobička).</div>
+<div><strong>3. Tarča (>$340–$380 · P/S >8.5x):</strong> 🚨 Popolna prodaja ob evforiji.</div>
+</div>
+</div>""", unsafe_allow_html=True)
 
 # --- 5. GUMB ZA AVTONOMNI AI PREGLED TRGA ---
 st.markdown("---")
@@ -434,7 +413,6 @@ if st.button("POŽENI AVTONOMNI AI PREGLED TRGA (Iskanje A+ Obratov)"):
             report_text = ""
             used_model = ""
             
-            # Samodejni REST klic na delujoče modele
             try:
                 list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}"
                 l_res = requests.get(list_url, timeout=10)
@@ -467,14 +445,13 @@ if st.button("POŽENI AVTONOMNI AI PREGLED TRGA (Iskanje A+ Obratov)"):
                 st.error("Googlov strežnik ni sprejel zahteve. Prosimo, preverite API ključ.")
 
 if "ai_report" in st.session_state:
-    st.markdown(f"""
-    <div class="ledger-card" style="border: 1px solid rgba(96, 165, 250, 0.4); margin-top: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
-            <h3 style="margin: 0; color: #60A5FA; font-size: 1.2rem;">🧠 Dnevno Poročilo AI Možganov (The Value Ledger 2.0)</h3>
-            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #9CA3AF;">Model: {st.session_state.get('used_model', 'Gemini')}</span>
-        </div>
-        <div style="font-size: 0.95rem; line-height: 1.7; color: #E5E7EB;">
-            {st.session_state['ai_report'].replace(chr(10), '<br>')}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    rep_formatted = st.session_state['ai_report'].replace('\n', '<br>')
+    st.markdown(f"""<div class="ledger-card" style="border:1px solid rgba(96,165,250,0.4);margin-top:20px;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px;">
+<h3 style="margin:0;color:#60A5FA;font-size:1.2rem;">🧠 Dnevno Poročilo AI Možganov (The Value Ledger 2.0)</h3>
+<span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:#9CA3AF;">Model: {st.session_state.get('used_model', 'Gemini')}</span>
+</div>
+<div style="font-size:0.95rem;line-height:1.7;color:#E5E7EB;">
+{rep_formatted}
+</div>
+</div>""", unsafe_allow_html=True)
