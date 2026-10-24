@@ -8,20 +8,30 @@ import pytz
 
 st.set_page_config(
     page_title="The Value Ledger 2.0 Terminal",
-    page_icon="Diamond",
+    page_icon="💎",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 st.markdown("""<style>
-html, body, .stApp { background-color: #06070B !important; color: #E2E8F0 !important; }
-section[data-testid="stSidebar"] { background-color: #0A0D14 !important; }
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+html, body, [class*="css"], .stApp {
+    background-color: #06070B !important;
+    font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
+    color: #E2E8F0 !important;
+    -webkit-font-smoothing: antialiased;
+}
+section[data-testid="stSidebar"] {
+    background-color: #0A0D14 !important;
+    border-right: 1px solid rgba(255,255,255,0.05) !important;
+}
 .ledger-card {
     background: rgba(13,17,28,0.7);
     border: 1px solid rgba(255,255,255,0.06);
     border-radius: 16px;
     padding: 22px 26px;
     margin-bottom: 20px;
+    backdrop-filter: blur(16px);
 }
 .mndy-hero-card {
     background: linear-gradient(145deg, rgba(20,17,10,0.8) 0%, rgba(10,9,6,0.9) 100%);
@@ -29,14 +39,16 @@ section[data-testid="stSidebar"] { background-color: #0A0D14 !important; }
     border-radius: 18px;
     padding: 24px 26px;
     margin-bottom: 22px;
+    box-shadow: 0 0 30px rgba(245,158,11,0.12);
 }
 .aplus-badge {
     display: inline-flex; align-items: center;
     border: 1.2px solid #F59E0B; color: #FBBF24;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600;
     font-size: 0.76rem; padding: 3px 12px; border-radius: 9999px;
 }
 .badge-sector {
-    font-size: 0.7rem; padding: 3px 8px; border-radius: 6px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 0.7rem; padding: 3px 8px; border-radius: 6px;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
     color: #94A3B8; text-transform: uppercase;
@@ -47,8 +59,14 @@ section[data-testid="stSidebar"] { background-color: #0A0D14 !important; }
     background: rgba(0,0,0,0.25); border-radius: 12px;
     border: 1px solid rgba(255,255,255,0.03);
 }
-.metric-label { color:#94A3B8; font-size:0.7rem; text-transform:uppercase; margin-bottom:3px; }
-.metric-value { font-size:1.02rem; color:#F8FAFC; }
+.metric-label { color:#94A3B8; font-size:0.7rem; text-transform:uppercase; margin-bottom:3px; font-family:'Space Grotesk',sans-serif; }
+.metric-value { font-family:'JetBrains Mono',monospace; font-size:1.02rem; color:#F8FAFC; }
+div.stButton > button {
+    background: linear-gradient(135deg,#F59E0B 0%,#D97706 100%) !important;
+    color:#0A0D14 !important; font-weight:600 !important;
+    font-family:'Space Grotesk',sans-serif !important;
+    border:none !important; border-radius:10px !important; padding:12px 24px !important;
+}
 .preclose-banner {
     background: linear-gradient(135deg, rgba(127,29,29,0.92) 0%, rgba(69,10,10,0.96) 100%);
     border: 1px solid rgba(248,113,113,0.55);
@@ -56,7 +74,7 @@ section[data-testid="stSidebar"] { background-color: #0A0D14 !important; }
 }
 </style>""", unsafe_allow_html=True)
 
-st.sidebar.markdown("### Google AI Nastavitev")
+st.sidebar.markdown("### 🔑 Google AI Nastavitev")
 api_key = st.sidebar.text_input("Vnesite brezplacni Gemini API kljuc:", type="password")
 
 TICKERS_CONFIG = {
@@ -264,19 +282,19 @@ def build_preclose_banner(held_ticker, evening):
         + '<div style="font-size:1.02rem;font-weight:700;color:#FEE2E2;">Pred-zapiralni alert za ' + str(held_ticker) + ' Trg: ' + str(regime) + '</div>'
         + '<div style="margin-top:5px;color:#FCA5A5;font-size:0.82rem;">Trg se bliza zaprtju. Sistem je ob osvezitvi preveril pozicijo.</div>'
         + '<div style="margin-top:10px;color:#FEE2E2;">ODLOCITEV: <span style="color:' + act_color + ';font-weight:700;">' + act + '</span></div>'
-        + '<div style="margin-top:10px;color:#FCA5A5;font-size:0.82rem;">King ocena: ' + str(h_score) + '/10 Cena: ' + str(h_last) + ' VWAP: ' + str(h_vwap) + '% Momentum: ' + str(h_mom) + '% Volumen: ' + str(h_vol) + 'x<br>'
+        + '<div style="margin-top:10px;color:#FCA5A5;font-size:0.82rem;">King ocena: ' + str(h_score) + '/10 Cena: ' + str(h_last) + ' VWAP: ' + str(h_vwap) + ' Momentum: ' + str(h_mom) + ' Volumen: ' + str(h_vol) + 'x<br>'
         + 'ATR stop/target: ' + str(a_stop) + ' / ' + str(a_tgt) + ' (ATR ' + str(a_atr) + ') Earnings: ' + str(earn) + '<br>'
         + 'Rotacija: ' + best_line + '</div></div>'
     )
     return html
 
 lj_time = datetime.now(LJ_TZ).strftime("%d.%m.%Y %H:%M CET")
-st.markdown(
+header_html = (
     '<div style="border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:14px;margin-bottom:20px;">'
     + '<h1 style="margin:0;font-size:1.8rem;font-weight:700;"><span style="color:#F59E0B;">THE VALUE LEDGER</span> <span style="color:#60A5FA;">2.0</span></h1>'
-    + '<p style="color:#94A3B8;font-size:0.82rem;">Kvantitativni Terminal ' + lj_time + '</p></div>',
-    unsafe_allow_html=True
+    + '<p style="color:#94A3B8;font-size:0.82rem;">Kvantitativni Terminal ' + lj_time + '</p></div>'
 )
+st.markdown(header_html, unsafe_allow_html=True)
 
 st.sidebar.markdown("### Vecerni takticni pregled")
 tick_list = list(TICKERS_CONFIG.keys())
@@ -381,7 +399,7 @@ with col_rot:
     st.markdown(rot_html, unsafe_allow_html=True)
 
 with col_exit:
-    st.markdown('<div class="ledger-card"><h4 style="color:#F59E0B;">MNDY Stopnje</h4><div style="font-size:0.82rem;color:#CBD5E1;">1. Tartca 220-240: prodaj 20-25%.<br>2. Tarca 280-310: prodaj 50%.<br>3. Tarca nad 340: popolna prodaja.</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="ledger-card"><h4 style="color:#F59E0B;">MNDY Stopnje</h4><div style="font-size:0.82rem;color:#CBD5E1;">1. Tarca 220-240: prodaj 20-25%.<br>2. Tarca 280-310: prodaj 50%.<br>3. Tarca nad 340: popolna prodaja.</div></div>', unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown("<h3>Avtonomni AI Analitik</h3>", unsafe_allow_html=True)
@@ -394,6 +412,30 @@ if st.button("POZENI AVTONOMNI AI PREGLED TRGA"):
             clean_key = api_key.strip()
             payload = {"contents": [{"parts": [{"text": prompt_text}]}]}
             success = False
-            report_text = ""
-            used_model = ""
-      
+            last_error = ""
+            models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+            for mname in models_to_try:
+                try:
+                    url = "https://generativelanguage.googleapis.com/v1beta/models/" + mname + ":generateContent?key=" + clean_key
+                    res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=25)
+                    if res.status_code == 200:
+                        report_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                        st.session_state["ai_report"] = report_text
+                        st.session_state["used_model"] = mname
+                        success = True
+                        break
+                    else:
+                        last_error = mname + ": " + str(res.status_code) + " " + res.text[:300]
+                        st.warning(last_error)
+                except Exception as e:
+                    last_error = mname + " izjema: " + str(e)
+                    st.warning(last_error)
+                    continue
+            if not success:
+                st.error("Kljuc ali model ni sprejet. Zadnja napaka: " + last_error)
+
+if "ai_report" in st.session_state:
+    rep = st.session_state["ai_report"].replace("\n", "<br>")
+    um = st.session_state.get("used_model", "Gemini")
+    rep_html = '<div class="ledger-card"><h3>Dnevno Porocilo AI (' + um + ')</h3><div style="font-size:0.92rem;line-height:1.7;">' + rep + '</div></div>'
+    st.markdown(rep_html, unsafe_allow_html=True)
