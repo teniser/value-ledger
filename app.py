@@ -1,7 +1,8 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import google.generativeai as genai
+import requests
+import json
 from datetime import datetime
 import pytz
 
@@ -53,52 +54,50 @@ if st.button("🤖 POŽENI AVTONOMNI AI PREGLED TRGA (Iskanje A+ Obratov)"):
     if not api_key:
         st.error("Prosimo, vnesite brezplačni API ključ v levi stranski vrstici!")
     else:
-        with st.spinner("Povezovanje z najnovejšim Gemini AI modelom in analiza trga..."):
-            genai.configure(api_key=api_key.strip())
-            
-            prompt = f"""
+        with st.spinner("Povezovanje z Gemini AI in analiza trga..."):
+            prompt_text = f"""
             Ti si elitni borzni analitik po kvantitativnem modelu 'The Value Ledger 2.0'.
             Formula: (Sentiment Obrata x Katalizator) x Makro Zascita x Temelji x Podcenjenost.
             Trenutne cene delnic na trgu: {data}
             
             Pripravi jedrnato, profesionalno porocilo:
             1. MNDY (#1 Asimetricni Long): Pojasni, zakaj ostaja #1 (stisnjen P/S 3.3x, 1.66 mrd gotovine brez dolga) in potrdi cilj 320 $+.
-            2. Doloci EDINEGA #1 A+ Takticnega zmagovalca dneva (CRWD ali kdor ima najvecji odboj in absorpcijo panike).
+            2. Doloci EDINEGA #1 A+ Takticnega zmagovalca dneva (CRWD z 8.2% skokom ali kdor ima najvecji odboj in absorpcijo panike).
             3. Podaj natancno navodilo za izstop pred zaprtjem trga ob 21:00 CET ob dosegu +5% do +8%+.
             
             Odgovori v slovenscini, zelo pregledno z ocenami od 1 do 10.
             """
             
-            # Seznam modelov po vrstnem redu od najnovejšega
-            candidate_models = [
-                "gemini-1.5-flash-latest",
-                "gemini-1.5-flash-8b",
-                "gemini-1.5-pro-latest",
-                "gemini-2.0-flash-exp",
-                "gemini-1.5-flash",
-                "gemini-1.0-pro"
-            ]
+            clean_key = api_key.strip()
+            # Neposreden in zanesljiv REST klic na uradni Google Gemini v1 API
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={clean_key}"
+            payload = {
+                "contents": [{
+                    "parts": [{"text": prompt_text}]
+                }]
+            }
             
-            success = False
-            last_err = ""
-            for m_name in candidate_models:
-                try:
-                    ai_engine = genai.GenerativeModel(m_name)
-                    response = ai_engine.generate_content(prompt)
-                    st.session_state["ai_report"] = response.text
-                    st.session_state["used_model"] = m_name
-                    success = True
-                    break
-                except Exception as e:
-                    last_err = str(e)
-                    continue
-            
-            if not success:
-                st.error(f"Napaka pri klicu AI modelov. Zadnja napaka: {last_err}")
+            try:
+                res = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+                if res.status_code == 200:
+                    res_json = res.json()
+                    report = res_json['candidates'][0]['content']['parts'][0]['text']
+                    st.session_state["ai_report"] = report
+                else:
+                    # Poskus z modelom gemini-1.5-pro, če flash ni na voljo
+                    url_pro = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={clean_key}"
+                    res_pro = requests.post(url_pro, json=payload, headers={"Content-Type": "application/json"})
+                    if res_pro.status_code == 200:
+                        res_json = res_pro.json()
+                        report = res_json['candidates'][0]['content']['parts'][0]['text']
+                        st.session_state["ai_report"] = report
+                    else:
+                        st.error(f"Googlov strežnik je vrnil napako ({res.status_code}): {res.text}")
+            except Exception as err:
+                st.error(f"Napaka pri povezavi: {err}")
 
 if "ai_report" in st.session_state:
     st.markdown("### 🧠 Poročilo AI Analitika")
-    st.caption(f"Uspešno zagnano prek modela: {st.session_state.get('used_model', 'Gemini')}")
     st.markdown(f"<div class='card'>{st.session_state['ai_report']}</div>", unsafe_allow_html=True)
 
 # --- 1. KARTICA: MNDY ---
