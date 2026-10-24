@@ -1,4 +1,4 @@
-import streamlit as st
+mport streamlit as st
 import yfinance as yf
 import pandas as pd
 import google.generativeai as genai
@@ -15,7 +15,6 @@ st.markdown("""
     .stApp { background-color: #050508; }
     .card { background: rgba(17, 24, 39, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 20px; margin-bottom: 18px; }
     .hero-mndy { border: 2px solid #F59E0B; box-shadow: 0 0 20px rgba(245, 158, 11, 0.25); background: rgba(24, 20, 10, 0.85); }
-    .aplus-badge { border: 1.8px solid #F59E0B; color: #FBBF24; padding: 4px 12px; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -23,11 +22,20 @@ st.markdown("""
 st.sidebar.markdown("### 🔑 Google Gemini AI Nastavitev")
 api_key = st.sidebar.text_input("Vnesite vaš brezplačni Gemini API ključ:", type="password")
 
+model = None
 if api_key:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    try:
+        genai.configure(api_key=api_key.strip())
+        # Avtomatski poskus delujočega modela
+        for m_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
+            try:
+                model = genai.GenerativeModel(m_name)
+                break
+            except:
+                continue
+    except Exception as e:
+        st.sidebar.error(f"Napaka pri ključu: {e}")
 else:
-    model = None
     st.sidebar.warning("⚠️ Vnesite vaš API ključ zgoraj.")
 
 # --- BAZA DELNIC ---
@@ -58,24 +66,27 @@ st.caption(f"Sentiment Obrata × Makro Zaščita × Temelji × Podcenjenost · �
 
 # --- GUMB ZA DNEVNI AI PREGLED TRGA ---
 if st.button("🤖 POŽENI AVTONOMNI AI PREGLED TRGA (Iskanje A+ Obratov)"):
-    if not model:
-        st.error("Prosimo, vnesite API ključ v levi stranski vrstici!")
+    if not api_key:
+        st.error("Prosimo, vnesite brezplačni API ključ v levi stranski vrstici!")
     else:
-        with st.spinner("AI analizira trg, absorpcijo panike in išče A+ obrate..."):
-            prompt = f"""
-            Ti si borzni analitik po modelu 'The Value Ledger 2.0'.
-            Formula: (Sentiment Obrata x Katalizator) x Makro Zascita x Temelji x Podcenjenost.
-            Trenutne borzne cene: {data}
-            
-            Analiziraj:
-            1. MNDY (#1 Asimetricni Long): Ali ostaja #1 ali priporocas rotacijo?
-            2. Doloci EDINEGA #1 A+ Takticnega zmagovalca dneva (kdor ima najvecjo preprodanost in odboj).
-            3. Podaj navodilo za izstop ob 21:00 CET pred zaprtjem trga.
-            
-            Odgovori v slovenscini, pregledno z ocenami od 1 do 10.
-            """
-            response = model.generate_content(prompt)
-            st.session_state["ai_report"] = response.text
+        with st.spinner("AI analizira celoten trg, premarket tokove in išče A+ obrate..."):
+            try:
+                prompt = f"""
+                Ti si elitni borzni analitik po modelu 'The Value Ledger 2.0'.
+                Formula: (Sentiment Obrata x Katalizator) x Makro Zascita x Temelji x Podcenjenost.
+                Trenutne cene na trgu: {data}
+                
+                Naredi natancno analizo:
+                1. MNDY (#1 Asimetricni Long): Pojasni, zakaj ostaja #1 (P/S 3.3x, 1.66 mrd gotovine brez dolga) in ali drzis pozicijo.
+                2. Doloci EDINEGA #1 A+ Takticnega zmagovalca dneva (CRWD ali kdor ima najvecji odboj in absorpcijo panike).
+                3. Podaj tocno navodilo za izstop pred zaprtjem trga ob 21:00 CET ob dosegu +5% do +8%+.
+                
+                Odgovori v slovenscini, pregledno z ocenami od 1 do 10.
+                """
+                response = model.generate_content(prompt)
+                st.session_state["ai_report"] = response.text
+            except Exception as err:
+                st.error(f"Napaka pri klicu AI: {err}")
 
 if "ai_report" in st.session_state:
     st.markdown("### 🧠 Poročilo AI Analitika")
@@ -91,7 +102,7 @@ st.markdown(f"""
             <p style="color:#9CA3AF;">Glavna naložba (+200 % potencial do 320 $+) · 1.66B $ gotovine, 0 dolga</p>
         </div>
         <div style="text-align:right;">
-            <h2>${m['price']} <span style="font-size:1rem; color:#10B981;">+{m['chg']}%</span></h2>
+            <h2>${m['price']} <span style="font-size:1rem; color:#10B981;">{m['chg']}%</span></h2>
             <div style="color:#F59E0B; font-weight:700;">P/S: {m['ps']}x · Ocena: 9.4 / 10</div>
         </div>
     </div>
