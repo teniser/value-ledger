@@ -9,82 +9,87 @@ import pytz
 
 # --- NASTAVITEV STRANI ---
 st.set_page_config(
-    page_title="The Value Ledger 2.0 · Luxury Terminal",
+    page_title="The Value Ledger 2.0 · Terminal",
     page_icon="💎",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- LUXURY OLED OBSIDIAN & GLASSMORPHISM STIL ---
+# --- PREFINJENA, ELEGANTNA TIPOGRAFIJA IN LUXURY DARK STIL ---
 st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 
 html, body, [class*="css"], .stApp {
-    background-color: #050508 !important;
-    font-family: 'Inter', sans-serif !important;
-    color: #F3F4F6 !important;
+    background-color: #06070B !important;
+    font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
+    color: #E2E8F0 !important;
+    -webkit-font-smoothing: antialiased;
 }
 
 section[data-testid="stSidebar"] {
-    background-color: #090D16 !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background-color: #0A0D14 !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
+/* Eleganten glassmorphism brez tezkih senc */
 .ledger-card {
-    background: linear-gradient(135deg, rgba(17, 24, 39, 0.75) 0%, rgba(9, 13, 22, 0.9) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(13, 17, 28, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 22px;
-    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(14px);
+    padding: 22px 26px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(16px);
 }
 
+/* Zlata obroba za MNDY - mehka, elegantna */
 .mndy-hero-card {
-    background: linear-gradient(135deg, rgba(24, 20, 10, 0.85) 0%, rgba(12, 10, 6, 0.95) 100%);
-    border: 2px solid #F59E0B;
+    background: linear-gradient(145deg, rgba(20, 17, 10, 0.8) 0%, rgba(10, 9, 6, 0.9) 100%);
+    border: 1.5px solid rgba(245, 158, 11, 0.6);
     border-radius: 18px;
-    padding: 26px;
-    margin-bottom: 24px;
-    box-shadow: 0 0 25px rgba(245, 158, 11, 0.25);
-    animation: pulseGold 3s infinite ease-in-out;
+    padding: 24px 26px;
+    margin-bottom: 22px;
+    box-shadow: 0 0 30px rgba(245, 158, 11, 0.12);
+    animation: softGoldPulse 3.5s infinite ease-in-out;
 }
 
-@keyframes pulseGold {
-    0%, 100% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.7); }
-    50% { box-shadow: 0 0 32px rgba(245, 158, 11, 0.5); border-color: #FBBF24; }
+@keyframes softGoldPulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.45); }
+    50% { box-shadow: 0 0 35px rgba(245, 158, 11, 0.28); border-color: rgba(251, 191, 36, 0.85); }
 }
 
+/* Transparentna A+ Znacka - prefinjena */
 .aplus-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     background: transparent !important;
-    border: 1.8px solid #F59E0B;
+    border: 1.2px solid #F59E0B;
     color: #FBBF24;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    font-size: 0.8rem;
-    padding: 4px 14px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 0.76rem;
+    padding: 3px 12px;
     border-radius: 9999px;
-    box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
-    animation: pulseGoldBadge 2.2s infinite ease-in-out;
-    letter-spacing: 0.5px;
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.25);
+    animation: softBadgePulse 2.5s infinite ease-in-out;
+    letter-spacing: 0.8px;
 }
 
-@keyframes pulseGoldBadge {
-    0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.25); border-color: #F59E0B; }
-    50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.7); border-color: #FDE68A; }
+@keyframes softBadgePulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.5); }
+    50% { box-shadow: 0 0 18px rgba(245, 158, 11, 0.45); border-color: #FDE68A; }
 }
 
 .badge-sector {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 500;
     padding: 3px 8px;
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #9CA3AF;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94A3B8;
+    letter-spacing: 0.6px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .metrics-grid {
@@ -92,41 +97,48 @@ section[data-testid="stSidebar"] {
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: 12px;
     margin: 16px 0;
-    padding: 14px;
-    background: rgba(0, 0, 0, 0.35);
+    padding: 14px 18px;
+    background: rgba(0, 0, 0, 0.25);
     border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .metric-label {
-    color: #9CA3AF;
-    font-size: 0.72rem;
-    margin-bottom: 2px;
+    color: #94A3B8;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
     text-transform: uppercase;
+    font-family: 'Space Grotesk', sans-serif;
 }
 
 .metric-value {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #FFFFFF;
+    font-size: 1.02rem;
+    font-weight: 500;
+    color: #F8FAFC;
+    letter-spacing: -0.2px;
 }
 
+/* Gumb za AI zagon */
 div.stButton > button {
     background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
-    color: #000000 !important;
-    font-weight: 700 !important;
-    font-family: 'JetBrains Mono', monospace !important;
+    color: #0A0D14 !important;
+    font-weight: 600 !important;
+    font-family: 'Space Grotesk', sans-serif !important;
     border: none !important;
     border-radius: 10px !important;
     padding: 12px 24px !important;
-    font-size: 0.95rem !important;
-    box-shadow: 0 4px 18px rgba(245, 158, 11, 0.3) !important;
+    font-size: 0.92rem !important;
+    letter-spacing: 0.3px !important;
+    box-shadow: 0 4px 18px rgba(245, 158, 11, 0.25) !important;
     transition: all 0.2s ease-in-out !important;
 }
 
 div.stButton > button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 25px rgba(245, 158, 11, 0.5) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 24px rgba(245, 158, 11, 0.4) !important;
 }
 </style>""", unsafe_allow_html=True)
 
@@ -210,21 +222,21 @@ data = get_live_data()
 # --- GLAVA TERMINALA ---
 lj_time = datetime.now(pytz.timezone("Europe/Ljubljana")).strftime("%d.%m.%Y · %H:%M CET")
 
-header_html = f"""<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:16px;margin-bottom:22px;">
+header_html = f"""<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:14px;margin-bottom:20px;">
 <div>
-<h1 style="margin:0;font-size:1.95rem;font-weight:800;letter-spacing:-0.5px;">
-<span style="color:#F59E0B;">THE VALUE LEDGER</span> <span style="color:#60A5FA;">2.0</span>
+<h1 style="margin:0;font-family:'Space Grotesk',sans-serif;font-size:1.8rem;font-weight:700;letter-spacing:-0.5px;">
+<span style="color:#F59E0B;">THE VALUE LEDGER</span> <span style="color:#60A5FA;font-weight:400;">2.0</span>
 </h1>
-<p style="margin:4px 0 0 0;color:#9CA3AF;font-size:0.85rem;">
-Sentiment Obrata × Makro Zaščita × Temelji × Podcenjenost · Osebni Kvantitativni Terminal
+<p style="margin:3px 0 0 0;color:#94A3B8;font-size:0.82rem;font-weight:400;">
+Sentiment Obrata × Makro Zaščita × Temelji × Podcenjenost · Kvantitativni Terminal
 </p>
 </div>
 <div style="text-align:right;">
-<div style="display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:5px 12px;border-radius:9999px;">
-<span style="width:8px;height:8px;background:#10B981;border-radius:50%;box-shadow:0 0 10px #10B981;"></span>
-<span style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#10B981;font-weight:700;">ŽIVI BORZNI RADAR AKTIVEN</span>
+<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);padding:4px 10px;border-radius:9999px;">
+<span style="width:6px;height:6px;background:#10B981;border-radius:50%;box-shadow:0 0 8px #10B981;"></span>
+<span style="font-family:'Space Grotesk',sans-serif;font-size:0.74rem;color:#10B981;font-weight:600;letter-spacing:0.4px;">ŽIVI RADAR AKTIVEN</span>
 </div>
-<div style="font-size:0.72rem;color:#6B7280;font-family:'JetBrains Mono',monospace;margin-top:4px;">{lj_time}</div>
+<div style="font-size:0.7rem;color:#64748B;font-family:'JetBrains Mono',monospace;margin-top:3px;">{lj_time}</div>
 </div>
 </div>"""
 st.markdown(header_html, unsafe_allow_html=True)
@@ -237,18 +249,18 @@ m_sign = "+" if mndy_live["chg"] >= 0 else ""
 mndy_card_html = f"""<div class="mndy-hero-card">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
 <div>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-<span style="font-family:'JetBrains Mono',monospace;font-size:1.45rem;font-weight:800;color:#FFFFFF;">MNDY</span>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+<span style="font-family:'Space Grotesk',sans-serif;font-size:1.35rem;font-weight:700;color:#FFFFFF;letter-spacing:0.3px;">MNDY</span>
 <span class="badge-sector">SaaS / Work OS</span>
-<span style="background:rgba(245,158,11,0.2);border:1px solid #F59E0B;color:#FBBF24;font-size:0.72rem;font-weight:700;padding:3px 8px;border-radius:6px;">💎 #1 ASIMETRIČNA GLAVNA NALOŽBA</span>
+<span style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);color:#FBBF24;font-family:'Space Grotesk',sans-serif;font-size:0.7rem;font-weight:600;padding:2px 8px;border-radius:6px;letter-spacing:0.5px;">💎 #1 ASIMETRIČNA GLAVNA NALOŽBA</span>
 </div>
-<div style="color:#9CA3AF;font-size:0.9rem;">monday.com Ltd. · Glavna Trdnjava Portfelja (+200 % Potencial do 320 $+)</div>
+<div style="color:#94A3B8;font-size:0.86rem;font-weight:400;">monday.com Ltd. · Glavna Trdnjava Portfelja (+200 % Potencial do 320 $+)</div>
 </div>
 <div style="text-align:right;">
-<div style="font-size:1.85rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#FFFFFF;">
-${mndy_live['price']} <span style="font-size:1rem;color:{m_col};">{m_sign}{mndy_live['chg']}%</span>
+<div style="font-size:1.7rem;font-weight:600;font-family:'JetBrains Mono',monospace;color:#FFFFFF;letter-spacing:-0.5px;">
+${mndy_live['price']} <span style="font-size:0.95rem;color:{m_col};font-weight:500;">{m_sign}{mndy_live['chg']}%</span>
 </div>
-<div style="color:#F59E0B;font-weight:700;font-family:'JetBrains Mono',monospace;">Ocena Asimetrije: 9.4 / 10</div>
+<div style="color:#F59E0B;font-weight:600;font-family:'Space Grotesk',sans-serif;font-size:0.82rem;margin-top:2px;">Ocena Asimetrije: 9.4 / 10</div>
 </div>
 </div>
 <div class="metrics-grid">
@@ -259,9 +271,9 @@ ${mndy_live['price']} <span style="font-size:1rem;color:{m_col};">{m_sign}{mndy_
 <div><div class="metric-label">Rule of 40</div><div class="metric-value" style="color:#10B981;">46% (Elitno)</div></div>
 <div><div class="metric-label">Gotovina / Dolg</div><div class="metric-value" style="color:#FBBF24;">>1.66B $ (0 dolga)</div></div>
 </div>
-<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(245,158,11,0.2);padding-top:12px;font-size:0.85rem;flex-wrap:wrap;gap:8px;">
-<span style="color:#D1D5DB;"><strong>Status:</strong> 🟢 Akumuliraj in mirno drži do ciljnih stopenj.</span>
-<span style="color:#9CA3AF;font-family:'JetBrains Mono',monospace;">1. Tarča: $230 (5.5x) · 2. Tarča: $290 (7.5x) · 3. Tarča: $350+ (8.5x+)</span>
+<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(245,158,11,0.15);padding-top:10px;font-size:0.82rem;flex-wrap:wrap;gap:8px;">
+<span style="color:#CBD5E1;font-weight:400;"><strong>Status:</strong> 🟢 Akumuliraj in mirno drži do ciljnih stopenj.</span>
+<span style="color:#94A3B8;font-family:'JetBrains Mono',monospace;font-size:0.78rem;">1. Tarča: $230 (5.5x) · 2. Tarča: $290 (7.5x) · 3. Tarča: $350+ (8.5x+)</span>
 </div>
 </div>"""
 st.markdown(mndy_card_html, unsafe_allow_html=True)
@@ -274,18 +286,18 @@ c_sign = "+" if crwd_live["chg"] >= 0 else ""
 crwd_card_html = f"""<div class="ledger-card">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
 <div>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-<span style="font-family:'JetBrains Mono',monospace;font-size:1.35rem;font-weight:800;color:#FFFFFF;">CRWD</span>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+<span style="font-family:'Space Grotesk',sans-serif;font-size:1.25rem;font-weight:700;color:#FFFFFF;letter-spacing:0.3px;">CRWD</span>
 <span class="badge-sector">Kibernetska varnost</span>
 <div class="aplus-badge">🌟 A+ SETUP</div>
 </div>
-<div style="color:#9CA3AF;font-size:0.85rem;">CrowdStrike · Edini potrjeni taktični obrat dneva (Absorpcija panike & Short Squeeze)</div>
+<div style="color:#94A3B8;font-size:0.84rem;font-weight:400;">CrowdStrike · Edini potrjeni taktični obrat dneva (Absorpcija panike & Short Squeeze)</div>
 </div>
 <div style="text-align:right;">
-<div style="font-size:1.65rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:#FFFFFF;">
-${crwd_live['price']} <span style="font-size:0.95rem;color:{c_col};">{c_sign}{crwd_live['chg']}%</span>
+<div style="font-size:1.55rem;font-weight:600;font-family:'JetBrains Mono',monospace;color:#FFFFFF;letter-spacing:-0.5px;">
+${crwd_live['price']} <span style="font-size:0.9rem;color:{c_col};font-weight:500;">{c_sign}{crwd_live['chg']}%</span>
 </div>
-<div style="color:#10B981;font-weight:700;font-family:'JetBrains Mono',monospace;">Ocena Obrata: 9.5 / 10</div>
+<div style="color:#10B981;font-weight:600;font-family:'Space Grotesk',sans-serif;font-size:0.8rem;margin-top:2px;">Ocena Obrata: 9.5 / 10</div>
 </div>
 </div>
 <div class="metrics-grid">
@@ -296,7 +308,7 @@ ${crwd_live['price']} <span style="font-size:0.95rem;color:{c_col};">{c_sign}{cr
 <div><div class="metric-label">Zadržanje Strank</div><div class="metric-value" style="color:#10B981;">>97%</div></div>
 <div><div class="metric-label">Premarket Skok</div><div class="metric-value" style="color:#10B981;">+0.4% → +8.2%</div></div>
 </div>
-<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;font-size:0.8rem;color:#9CA3AF;">
+<div style="border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;font-size:0.78rem;color:#94A3B8;">
 <strong>Trgovalno pravilo:</strong> Vstop v premarketu / ob odprtju · Izstop ob dosegu +5 % do +8 %+ pred zaprtjem ob 21:00 CET.
 </div>
 </div>"""
@@ -306,7 +318,7 @@ st.markdown(crwd_card_html, unsafe_allow_html=True)
 col_radar, col_table = st.columns([1, 1.25])
 
 with col_radar:
-    st.markdown("<h3 style='font-size: 1.15rem; margin-bottom: 12px;'>🕸️ Primerjava 4 Stebrov</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='font-family:\"Space Grotesk\",sans-serif;font-size:1.05rem;font-weight:600;margin-bottom:10px;color:#F1F5F9;'>🕸️ Primerjava 4 Stebrov</h3>", unsafe_allow_html=True)
     selected_tickers = st.multiselect(
         "Izberite delnice za primerjavo:",
         options=list(TICKERS_CONFIG.keys()),
@@ -323,24 +335,24 @@ with col_radar:
         values.append(values[0])
         fig.add_trace(go.Scatterpolar(
             r=values, theta=categories + [categories[0]], name=t,
-            line=dict(color=colors.get(t, "#FFFFFF"), width=2.5),
+            line=dict(color=colors.get(t, "#FFFFFF"), width=2),
             fill='toself',
-            fillcolor=f"rgba({int(colors.get(t, '#FFFFFF')[1:3], 16)}, {int(colors.get(t, '#FFFFFF')[3:5], 16)}, {int(colors.get(t, '#FFFFFF')[5:7], 16)}, 0.15)"
+            fillcolor=f"rgba({int(colors.get(t, '#FFFFFF')[1:3], 16)}, {int(colors.get(t, '#FFFFFF')[3:5], 16)}, {int(colors.get(t, '#FFFFFF')[5:7], 16)}, 0.12)"
         ))
 
     fig.update_layout(
         polar=dict(
-            radialaxis=dict(visible=True, range=[0, 10], color="#9CA3AF", gridcolor="rgba(255,255,255,0.08)"),
-            angularaxis=dict(color="#F3F4F6", gridcolor="rgba(255,255,255,0.08)")
+            radialaxis=dict(visible=True, range=[0, 10], color="#64748B", gridcolor="rgba(255,255,255,0.05)"),
+            angularaxis=dict(color="#CBD5E1", gridcolor="rgba(255,255,255,0.05)")
         ),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        showlegend=True, legend=dict(font=dict(color="#F3F4F6", size=10)),
-        margin=dict(l=20, r=20, t=10, b=10), height=320
+        showlegend=True, legend=dict(font=dict(family="Space Grotesk", color="#CBD5E1", size=10)),
+        margin=dict(l=20, r=20, t=10, b=10), height=300
     )
     st.plotly_chart(fig, use_container_width=True)
 
 with col_table:
-    st.markdown("<h3 style='font-size: 1.15rem; margin-bottom: 12px;'>📊 Primerjalna Tabela 9 Delnic</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='font-family:\"Space Grotesk\",sans-serif;font-size:1.05rem;font-weight:600;margin-bottom:10px;color:#F1F5F9;'>📊 Primerjalna Tabela 9 Delnic</h3>", unsafe_allow_html=True)
     table_rows = []
     for t, c in TICKERS_CONFIG.items():
         ld = data.get(t, {"price": 0.0, "chg": 0.0, "ps": 0.0})
@@ -365,19 +377,19 @@ col_rot, col_exit = st.columns(2)
 
 with col_rot:
     st.markdown("""<div class="ledger-card">
-<h4 style="margin:0 0 8px 0;color:#10B981;font-size:1rem;">🔄 Capital Rotation Radar (Signal za Rotacijo)</h4>
-<p style="font-size:0.85rem;color:#9CA3AF;margin-bottom:12px;">
+<h4 style="margin:0 0 6px 0;color:#10B981;font-family:'Space Grotesk',sans-serif;font-size:0.95rem;font-weight:600;">🔄 Capital Rotation Radar (Signal za Rotacijo)</h4>
+<p style="font-size:0.82rem;color:#94A3B8;margin-bottom:10px;font-weight:400;">
 Sistem nenehno preverja, ali se na trgu pojavi naložba z večjo asimetrijo od MNDY.
 </p>
-<div style="background:rgba(16,185,129,0.1);border:1px solid #10B981;border-radius:8px;padding:12px;font-size:0.85rem;color:#6EE7B7;">
+<div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:10px 14px;font-size:0.82rem;color:#6EE7B7;">
 <strong>🟢 TRENUTNI STATUS:</strong> MNDY ostaja trdna #1 izbira (Ocena 9.4). Ni potrebe po rotaciji kapitala.
 </div>
 </div>""", unsafe_allow_html=True)
 
 with col_exit:
     st.markdown("""<div class="ledger-card">
-<h4 style="margin:0 0 8px 0;color:#F59E0B;font-size:1rem;">🎯 MNDY Stopnje za Zaklep Dobička</h4>
-<div style="font-size:0.85rem;color:#D1D5DB;line-height:1.7;">
+<h4 style="margin:0 0 6px 0;color:#F59E0B;font-family:'Space Grotesk',sans-serif;font-size:0.95rem;font-weight:600;">🎯 MNDY Stopnje za Zaklep Dobička</h4>
+<div style="font-size:0.82rem;color:#CBD5E1;line-height:1.6;font-weight:400;">
 <div><strong>1. Tarča ($220–$240 · P/S ~5.5x):</strong> Prodaj 20–25 % (Izplačilo vložka / Risk-Free).</div>
 <div><strong>2. Tarča ($280–$310 · P/S ~7.5x):</strong> Prodaj 50 % preostanka (Zaklep glavnine dobička).</div>
 <div><strong>3. Tarča (>$340–$380 · P/S >8.5x):</strong> 🚨 Popolna prodaja ob evforiji.</div>
@@ -386,7 +398,7 @@ with col_exit:
 
 # --- 5. GUMB ZA AVTONOMNI AI PREGLED TRGA ---
 st.markdown("---")
-st.markdown("<h3 style='font-size: 1.2rem; margin-bottom: 10px;'>🤖 Avtonomni AI Analitik (Google Gemini)</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='font-family:\"Space Grotesk\",sans-serif;font-size:1.1rem;font-weight:600;margin-bottom:10px;color:#F1F5F9;'>🤖 Avtonomni AI Analitik (Google Gemini)</h3>", unsafe_allow_html=True)
 
 if st.button("POŽENI AVTONOMNI AI PREGLED TRGA (Iskanje A+ Obratov)"):
     if not api_key:
@@ -446,12 +458,12 @@ if st.button("POŽENI AVTONOMNI AI PREGLED TRGA (Iskanje A+ Obratov)"):
 
 if "ai_report" in st.session_state:
     rep_formatted = st.session_state['ai_report'].replace('\n', '<br>')
-    st.markdown(f"""<div class="ledger-card" style="border:1px solid rgba(96,165,250,0.4);margin-top:20px;">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px;">
-<h3 style="margin:0;color:#60A5FA;font-size:1.2rem;">🧠 Dnevno Poročilo AI Možganov (The Value Ledger 2.0)</h3>
-<span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:#9CA3AF;">Model: {st.session_state.get('used_model', 'Gemini')}</span>
+    st.markdown(f"""<div class="ledger-card" style="border:1px solid rgba(96,165,250,0.3);margin-top:20px;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:8px;">
+<h3 style="margin:0;color:#60A5FA;font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:600;">🧠 Dnevno Poročilo AI Možganov (The Value Ledger 2.0)</h3>
+<span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:#94A3B8;">Model: {st.session_state.get('used_model', 'Gemini')}</span>
 </div>
-<div style="font-size:0.95rem;line-height:1.7;color:#E5E7EB;">
+<div style="font-size:0.92rem;line-height:1.7;color:#E2E8F0;font-weight:400;">
 {rep_formatted}
 </div>
 </div>""", unsafe_allow_html=True)
