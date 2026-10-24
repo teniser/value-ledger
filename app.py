@@ -22,22 +22,6 @@ st.markdown("""
 st.sidebar.markdown("### 🔑 Google Gemini AI Nastavitev")
 api_key = st.sidebar.text_input("Vnesite vaš brezplačni Gemini API ključ:", type="password")
 
-model = None
-if api_key:
-    try:
-        genai.configure(api_key=api_key.strip())
-        # Avtomatski poskus delujočega modela
-        for m_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
-            try:
-                model = genai.GenerativeModel(m_name)
-                break
-            except:
-                continue
-    except Exception as e:
-        st.sidebar.error(f"Napaka pri ključu: {e}")
-else:
-    st.sidebar.warning("⚠️ Vnesite vaš API ključ zgoraj.")
-
 # --- BAZA DELNIC ---
 WATCHLIST = ["MNDY", "CRWD", "SNOW", "HUBS", "DELL", "DDOG", "TEAM", "NOW", "PLTR"]
 
@@ -69,27 +53,37 @@ if st.button("🤖 POŽENI AVTONOMNI AI PREGLED TRGA (Iskanje A+ Obratov)"):
     if not api_key:
         st.error("Prosimo, vnesite brezplačni API ključ v levi stranski vrstici!")
     else:
-        with st.spinner("AI analizira celoten trg, premarket tokove in išče A+ obrate..."):
+        with st.spinner("Povezovanje z AI modelom in analiza borznega trga..."):
             try:
+                genai.configure(api_key=api_key.strip())
+                
+                # Samodejno iskanje prvega delujočega modela z vgrajeno podporo
+                available_models = [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]
+                chosen_model = available_models[0] if available_models else "gemini-pro"
+                
+                ai_engine = genai.GenerativeModel(chosen_model)
+                
                 prompt = f"""
                 Ti si elitni borzni analitik po modelu 'The Value Ledger 2.0'.
                 Formula: (Sentiment Obrata x Katalizator) x Makro Zascita x Temelji x Podcenjenost.
                 Trenutne cene na trgu: {data}
                 
                 Naredi natancno analizo:
-                1. MNDY (#1 Asimetricni Long): Pojasni, zakaj ostaja #1 (P/S 3.3x, 1.66 mrd gotovine brez dolga) in ali drzis pozicijo.
-                2. Doloci EDINEGA #1 A+ Takticnega zmagovalca dneva (CRWD ali kdor ima najvecji odboj in absorpcijo panike).
+                1. MNDY (#1 Asimetricni Long): Pojasni, zakaj ostaja #1 (P/S 3.3x, 1.66 mrd gotovine brez dolga) in potrdi cilj 320 $+.
+                2. Doloci EDINEGA #1 A+ Takticnega zmagovalca dneva (CRWD z 8.2% skokom ali kdor ima najvecji odboj).
                 3. Podaj tocno navodilo za izstop pred zaprtjem trga ob 21:00 CET ob dosegu +5% do +8%+.
                 
-                Odgovori v slovenscini, pregledno z ocenami od 1 do 10.
+                Odgovori v slovenscini, zelo pregledno z ocenami od 1 do 10.
                 """
-                response = model.generate_content(prompt)
+                response = ai_engine.generate_content(prompt)
                 st.session_state["ai_report"] = response.text
+                st.session_state["used_model"] = chosen_model
             except Exception as err:
                 st.error(f"Napaka pri klicu AI: {err}")
 
 if "ai_report" in st.session_state:
     st.markdown("### 🧠 Poročilo AI Analitika")
+    st.caption(f"Poganja model: {st.session_state.get('used_model', 'Gemini')}")
     st.markdown(f"<div class='card'>{st.session_state['ai_report']}</div>", unsafe_allow_html=True)
 
 # --- 1. KARTICA: MNDY ---
