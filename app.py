@@ -62,42 +62,76 @@ if st.button("🤖 POŽENI AVTONOMNI AI PREGLED TRGA (Iskanje A+ Obratov)"):
             
             Pripravi jedrnato, profesionalno porocilo:
             1. MNDY (#1 Asimetricni Long): Pojasni, zakaj ostaja #1 (stisnjen P/S 3.3x, 1.66 mrd gotovine brez dolga) in potrdi cilj 320 $+.
-            2. Doloci EDINEGA #1 A+ Takticnega zmagovalca dneva (CRWD z 8.2% skokom ali kdor ima najvecji odboj in absorpcijo panike).
+            2. Doloci EDINEGA #1 A+ Takticnega zmagovalca dneva (CRWD ali kdor ima najvecji odboj in absorpcijo panike).
             3. Podaj natancno navodilo za izstop pred zaprtjem trga ob 21:00 CET ob dosegu +5% do +8%+.
             
             Odgovori v slovenscini, zelo pregledno z ocenami od 1 do 10.
             """
             
             clean_key = api_key.strip()
-            # Neposreden in zanesljiv REST klic na uradni Google Gemini v1 API
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={clean_key}"
             payload = {
                 "contents": [{
                     "parts": [{"text": prompt_text}]
                 }]
             }
             
+            success = False
+            report_text = ""
+            used_model = ""
+            
+            # Najprej poskusimo pridobiti točen seznam razpoložljivih modelov za ta ključ
             try:
-                res = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
-                if res.status_code == 200:
-                    res_json = res.json()
-                    report = res_json['candidates'][0]['content']['parts'][0]['text']
-                    st.session_state["ai_report"] = report
+                list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}"
+                l_res = requests.get(list_url)
+                if l_res.status_code == 200:
+                    models_list = l_res.json().get("models", [])
+                    generate_models = [
+                        m["name"] for m in models_list 
+                        if "generateContent" in m.get("supportedGenerationMethods", [])
+                    ]
                 else:
-                    # Poskus z modelom gemini-1.5-pro, če flash ni na voljo
-                    url_pro = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={clean_key}"
-                    res_pro = requests.post(url_pro, json=payload, headers={"Content-Type": "application/json"})
-                    if res_pro.status_code == 200:
-                        res_json = res_pro.json()
-                        report = res_json['candidates'][0]['content']['parts'][0]['text']
-                        st.session_state["ai_report"] = report
-                    else:
-                        st.error(f"Googlov strežnik je vrnil napako ({res.status_code}): {res.text}")
-            except Exception as err:
-                st.error(f"Napaka pri povezavi: {err}")
+                    generate_models = []
+            except:
+                generate_models = []
+                
+            # Seznam kandidatov (od najnovejših do standardnih)
+            endpoints_to_try = []
+            for gm in generate_models:
+                endpoints_to_try.append(f"https://generativelanguage.googleapis.com/v1beta/{gm}:generateContent?key={clean_key}")
+                endpoints_to_try.append(f"https://generativelanguage.googleapis.com/v1/{gm}:generateContent?key={clean_key}")
+                
+            fallback_names = [
+                "models/gemini-1.5-flash-latest",
+                "models/gemini-1.5-flash",
+                "models/gemini-1.5-pro-latest",
+                "models/gemini-pro",
+                "models/gemini-1.0-pro"
+            ]
+            for fn in fallback_names:
+                endpoints_to_try.append(f"https://generativelanguage.googleapis.com/v1beta/{fn}:generateContent?key={clean_key}")
+                endpoints_to_try.append(f"https://generativelanguage.googleapis.com/v1/{fn}:generateContent?key={clean_key}")
+                
+            for url in endpoints_to_try:
+                try:
+                    res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=20)
+                    if res.status_code == 200:
+                        res_json = res.json()
+                        report_text = res_json['candidates'][0]['content']['parts'][0]['text']
+                        used_model = url.split("models/")[1].split(":")[0] if "models/" in url else "Gemini"
+                        success = True
+                        break
+                except:
+                    continue
+                    
+            if success:
+                st.session_state["ai_report"] = report_text
+                st.session_state["used_model"] = used_model
+            else:
+                st.error("Googlov strežnik ni sprejel zahteve. Prosimo, preverite, da ste pravilno kopirali celoten API ključ brez presledkov.")
 
 if "ai_report" in st.session_state:
     st.markdown("### 🧠 Poročilo AI Analitika")
+    st.caption(f"Model: {st.session_state.get('used_model', 'Gemini')}")
     st.markdown(f"<div class='card'>{st.session_state['ai_report']}</div>", unsafe_allow_html=True)
 
 # --- 1. KARTICA: MNDY ---
