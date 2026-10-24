@@ -324,7 +324,7 @@ st.markdown(f"""<div class="mndy-hero-card">
 crwd_live=data.get("CRWD",{"price":325.0,"chg":0.0,"ps":17.0})
 c_col="#10B981" if crwd_live["chg"]>=0 else "#EF4444"
 c_sign="+" if crwd_live["chg"]>=0 else ""
-st.markdown(f"""<div class="ledger-card">
+st.markdown(html_rot, unsafe_allow_html=True)
 <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
 <div><div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
 <span style="font-family:'Space Grotesk',sans-serif;font-size:1.25rem;font-weight:700;color:#FFFFFF;">CRWD</span>
