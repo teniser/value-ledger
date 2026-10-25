@@ -1,3 +1,4 @@
+import html
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, time, timedelta
@@ -10,7 +11,7 @@ import yfinance as yf
 
 
 # ============================================================
-# NASTAVITVE
+# NASTAVITVE IN VIDEZ
 # ============================================================
 
 st.set_page_config(
@@ -77,39 +78,52 @@ MIN_DOLLAR_VOLUME = 20_000_000
 
 
 # ============================================================
-# DELNIŠKI UNIVERZUM
+# UNIVERZUM IN PRIMERJALNE SKUPINE
 # ============================================================
 
 TICKER_CANDIDATES = [
+    # SaaS in programska oprema
     "MNDY", "CRWD", "SNOW", "HUBS", "DDOG", "TEAM", "NOW", "PANW",
     "PLTR", "CRM", "ADBE", "SHOP", "NET", "ZS", "OKTA", "MDB",
     "ESTC", "PATH", "WDAY", "CFLT", "DOCN", "GTLB", "TOST", "BILL",
     "ASAN", "IOT", "FSLY", "DT", "BSY", "PCOR", "NCNO", "ZM",
     "DOCU", "TWLO", "PD", "DBX", "SMAR", "UPWK", "SPT", "APPN",
     "PEGA", "FROG", "RNG", "VEEV", "TYL", "PTC", "ADSK", "TRMB",
+
+    # Velika tehnologija in internet
     "AAPL", "MSFT", "META", "AMZN", "GOOGL", "NFLX", "TSLA",
     "UBER", "ABNB", "DASH", "SPOT", "RBLX", "TTD", "ROKU",
     "PINS", "SNAP", "MTCH", "DKNG", "LYFT", "EBAY",
+
+    # Polprevodniki in strojna oprema
     "NVDA", "AVGO", "AMD", "TSM", "MU", "QCOM", "ARM", "SMCI",
     "ANET", "MRVL", "SNPS", "CDNS", "ANSS", "ALAB", "LITE",
     "COHR", "VRT", "NTNX", "PSTG", "STX", "WDC", "TXN", "ADI",
     "NXPI", "MCHP", "ON", "INTC", "ASML", "AMAT", "LRCX", "KLAC",
     "DELL", "CSCO", "HPE", "HPQ", "GLW", "TER", "KEYS",
+
+    # Kibernetska varnost
     "CHKP", "CYBR", "TENB", "VRNS", "QLYS", "FTNT", "AKAM",
     "VRSN", "GEN", "S",
+
+    # Finance in fintech
     "COIN", "HOOD", "XYZ", "PYPL", "SOFI", "AFRM", "MELI",
     "SE", "NU", "V", "MA", "GLBE", "JPM", "GS", "MS", "C",
     "BAC", "SCHW", "ICE", "CME",
+
+    # Zdravstvo
     "ISRG", "DXCM", "PODD", "EXAS", "ILMN", "ALGN", "MDT",
     "SYK", "BSX", "ABT", "VRTX", "REGN", "LLY", "NVO", "UNH",
+
+    # Industrija, energija in potrošnja
     "CAT", "DE", "ETN", "GE", "HON", "PH", "RTX", "LMT",
     "XOM", "CVX", "SLB", "FSLR", "ENPH", "NXT", "COST",
     "WMT", "HD", "LOW", "MCD", "NKE", "KO", "PG", "F",
     "GM", "RIVN", "LCID", "CVNA", "UPST", "Z", "W",
 ]
+
 AI_UNIVERSE = list(dict.fromkeys(TICKER_CANDIDATES))[:150]
 
-# Ročno sestavljene primerjalne skupine, ne uradna klasifikacija.
 SECTOR_GROUPS = {
     "SaaS / Software": [
         "MNDY", "SNOW", "HUBS", "DDOG", "TEAM", "NOW", "CRM", "ADBE",
@@ -227,40 +241,44 @@ def render_table(frame):
         st.dataframe(frame, use_container_width=True, hide_index=True)
 
 
-def statement_row(frame, names):
+def statement_row(frame, possible_names):
     if frame is None or frame.empty:
         return None
 
-    labels = {
+    normalized = {
         str(index).strip().lower().replace("_", " "): index
         for index in frame.index
     }
 
-    for name in names:
+    for name in possible_names:
         key = name.strip().lower().replace("_", " ")
-        if key in labels:
-            return frame.loc[labels[key]]
+        if key in normalized:
+            return frame.loc[normalized[key]]
 
-    for key, original in labels.items():
-        if any(name.strip().lower().replace("_", " ") in key for name in names):
+    for key, original in normalized.items():
+        if any(
+            name.strip().lower().replace("_", " ") in key
+            for name in possible_names
+        ):
             return frame.loc[original]
 
     return None
 
 
-def annual_values(frame, names):
-    row = statement_row(frame, names)
+def annual_values(frame, possible_names):
+    row = statement_row(frame, possible_names)
     if row is None:
         return {}
 
     result = {}
     for column, value in row.items():
         number = safe_float(value)
-        if number is not None:
-            try:
-                result[pd.Timestamp(column).year] = number
-            except Exception:
-                pass
+        if number is None:
+            continue
+        try:
+            result[pd.Timestamp(column).year] = number
+        except Exception:
+            pass
     return result
 
 
@@ -282,17 +300,93 @@ def midrank_percentile(values, target, lower_is_better=False):
     return round(max(0.0, min(100.0, result)))
 
 
+def estimate_revision_data(ticker_obj):
+    """
+    Yahoo Finance EPS revizije: neto spremembe števila zvišanj in znižanj
+    v zadnjih 30 dneh za bližnja obdobja, kadar so na voljo.
+    To ni popolna mera sentimenta in lahko manjka.
+    """
+    net_revisions = None
+    estimate_change_pct = None
+
+    try:
+        frame = ticker_obj.eps_revisions
+    except Exception:
+        frame = None
+
+    if frame is not None and not frame.empty:
+        columns = {str(column).lower(): column for column in frame.columns}
+        up_col = columns.get("uplast30days")
+        down_col = columns.get("downlast30days")
+
+        if up_col is not None and down_col is not None:
+            use_rows = frame
+            index_text = [str(index).lower().strip() for index in frame.index]
+            near_rows = [
+                index for index, label in zip(frame.index, index_text)
+                if "0q" in label or "+1q" in label or "1q" in label
+            ]
+            if near_rows:
+                use_rows = frame.loc[near_rows]
+
+            up_values = pd.to_numeric(use_rows[up_col], errors="coerce")
+            down_values = pd.to_numeric(use_rows[down_col], errors="coerce")
+            up_total = float(up_values.fillna(0).sum())
+            down_total = float(down_values.fillna(0).sum())
+
+            if up_total + down_total > 0:
+                net_revisions = int(round(up_total - down_total))
+
+    try:
+        trend = ticker_obj.eps_trend
+    except Exception:
+        trend = None
+
+    if trend is not None and not trend.empty:
+        columns = {str(column).lower(): column for column in trend.columns}
+        current_col = columns.get("current")
+        month_col = columns.get("30daysago")
+
+        if current_col is not None and month_col is not None:
+            index_text = [str(index).lower().strip() for index in trend.index]
+            near_rows = [
+                index for index, label in zip(trend.index, index_text)
+                if "0q" in label or "+1q" in label or "1q" in label
+            ]
+            use_rows = trend.loc[near_rows] if near_rows else trend
+
+            current = pd.to_numeric(
+                use_rows[current_col], errors="coerce"
+            ).dropna()
+            month_old = pd.to_numeric(
+                use_rows[month_col], errors="coerce"
+            ).dropna()
+            joined = pd.concat(
+                [current.rename("current"), month_old.rename("month_old")],
+                axis=1,
+            ).dropna()
+
+            valid = joined[joined["month_old"] != 0]
+            if not valid.empty:
+                estimate_change_pct = float(
+                    ((valid["current"] / valid["month_old"] - 1) * 100).mean()
+                )
+
+    return {
+        "eps_revision_net_30d": net_revisions,
+        "eps_estimate_change_30d_pct": estimate_change_pct,
+    }
+
+
 # ============================================================
-# TRŽNI REŽIM IN CAPITAL ROTATION
+# TRŽNI REŽIM IN CAPITAL ROTATION RADAR
 # ============================================================
 
 @st.cache_data(ttl=900, show_spinner=False)
 def get_market_regime():
     try:
         frame = yf.Ticker("SPY").history(
-            period="6mo",
-            interval="1d",
-            auto_adjust=True,
+            period="6mo", interval="1d", auto_adjust=True
         )
         if frame is None or len(frame) < 60:
             return {"regime": "NEZNANO", "change20": None, "penalty": 0.0}
@@ -343,9 +437,7 @@ def get_rotation():
     for ticker in list(etfs.values()) + ["SPY"]:
         try:
             data = yf.Ticker(ticker).history(
-                period="8mo",
-                interval="1d",
-                auto_adjust=True,
+                period="8mo", interval="1d", auto_adjust=True
             )
             if data is not None and not data.empty:
                 prices[ticker] = data["Close"].dropna().astype(float)
@@ -380,6 +472,7 @@ def get_rotation():
         rel5 = relative_return(prices[ticker], prices["SPY"], 5)
         rel20 = relative_return(prices[ticker], prices["SPY"], 20)
         rel60 = relative_return(prices[ticker], prices["SPY"], 60)
+
         if rel5 is None or rel20 is None or rel60 is None:
             continue
 
@@ -403,6 +496,7 @@ def get_rotation():
         })
 
     rows.sort(key=lambda row: row["Rel. 20d % vs SPY"], reverse=True)
+
     rotation = "NI PODATKOV"
     detail = ""
 
@@ -438,8 +532,67 @@ def get_rotation():
     return {"rows": rows, "rotation": rotation, "detail": detail}
 
 
+def saas_breadth(records):
+    """
+    Izračuna širino gibanja v ročno določeni SaaS skupini.
+    Odstotki temeljijo le na tickerjih z uporabno cenovno zgodovino.
+    """
+    members = [
+        ticker for ticker in SECTOR_GROUPS["SaaS / Software"]
+        if ticker in AI_UNIVERSE
+    ]
+    available = [records[ticker] for ticker in members if ticker in records]
+
+    valid20 = [row for row in available if row.get("return20") is not None]
+    valid_sma20 = [
+        row for row in available if row.get("above_sma20") is not None
+    ]
+    valid_sma50 = [
+        row for row in available if row.get("above_sma50") is not None
+    ]
+
+    def pct_true(rows, key):
+        if not rows:
+            return None
+        return 100 * sum(bool(row.get(key)) for row in rows) / len(rows)
+
+    rev_data = [
+        row for row in available
+        if row.get("eps_revision_net_30d") is not None
+    ]
+    trend_data = [
+        row for row in available
+        if row.get("eps_estimate_change_30d_pct") is not None
+    ]
+
+    positive_revisions = (
+        100 * sum(row["eps_revision_net_30d"] > 0 for row in rev_data)
+        / len(rev_data)
+        if rev_data else None
+    )
+    mean_eps_change = (
+        sum(row["eps_estimate_change_30d_pct"] for row in trend_data)
+        / len(trend_data)
+        if trend_data else None
+    )
+
+    return {
+        "universe_count": len(members),
+        "price_coverage": len(valid20),
+        "positive_20d_pct": pct_true(
+            valid20, "return20_positive"
+        ),
+        "above_sma20_pct": pct_true(valid_sma20, "above_sma20"),
+        "above_sma50_pct": pct_true(valid_sma50, "above_sma50"),
+        "eps_revision_coverage": len(rev_data),
+        "eps_positive_revision_pct": positive_revisions,
+        "eps_estimate_change_pct": mean_eps_change,
+        "eps_trend_coverage": len(trend_data),
+    }
+
+
 # ============================================================
-# FUNDAMENTALNI PODATKI
+# PODATKI POSAMEZNE DELNICE
 # ============================================================
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -467,6 +620,7 @@ def get_stock_data(ticker):
             cashflow = stock.cashflow
         except Exception:
             cashflow = None
+
         try:
             income = stock.income_stmt
         except Exception:
@@ -481,10 +635,12 @@ def get_stock_data(ticker):
             ],
         )
         capex = annual_values(
-            cashflow, ["Capital Expenditure", "Capital Expenditures"]
+            cashflow,
+            ["Capital Expenditure", "Capital Expenditures"],
         )
         sbc = annual_values(
-            cashflow, ["Stock Based Compensation", "Share Based Compensation"]
+            cashflow,
+            ["Stock Based Compensation", "Share Based Compensation"],
         )
         net_income = annual_values(
             income,
@@ -495,16 +651,20 @@ def get_stock_data(ticker):
             ],
         )
         revenue = annual_values(
-            income, ["Total Revenue", "Operating Revenue", "Revenue"]
+            income,
+            ["Total Revenue", "Operating Revenue", "Revenue"],
         )
         ebitda_by_year = annual_values(
-            income, ["EBITDA", "Normalized EBITDA"]
+            income,
+            ["EBITDA", "Normalized EBITDA"],
         )
 
-        years = sorted(set(cfo) & set(capex) & set(net_income) & set(revenue))[-5:]
-        annual = []
+        common_years = sorted(
+            set(cfo) & set(capex) & set(net_income) & set(revenue)
+        )[-5:]
 
-        for year in years:
+        annual = []
+        for year in common_years:
             annual.append({
                 "year": year,
                 "cfo": cfo[year],
@@ -520,7 +680,7 @@ def get_stock_data(ticker):
         fcf_years = len(annual)
         positive_fcf_years = sum(row["fcf"] > 0 for row in annual)
 
-        fcf_margins = [
+        margins = [
             row["fcf"] / row["revenue"] * 100
             for row in annual if row["revenue"] > 0
         ]
@@ -535,7 +695,7 @@ def get_stock_data(ticker):
         ]
 
         median_fcf_margin = (
-            float(pd.Series(fcf_margins).median()) if fcf_margins else None
+            float(pd.Series(margins).median()) if margins else None
         )
         median_conversion = (
             float(pd.Series(conversions).median()) if conversions else None
@@ -589,57 +749,34 @@ def get_stock_data(ticker):
         return20 = None
         return60 = None
         return120 = None
+        above_sma20 = None
+        above_sma50 = None
 
         if len(close) >= 20:
-            last = float(close.iloc[-1])
+            last_close = float(close.iloc[-1])
             high_52w = float(close.tail(252).max())
             if high_52w > 0:
-                drawdown_52w = (last / high_52w - 1) * 100
-            if len(close) > 20:
-                return20 = (last / float(close.iloc[-21]) - 1) * 100
-            if len(close) > 60:
-                return60 = (last / float(close.iloc[-61]) - 1) * 100
-            if len(close) > 120:
-                return120 = (last / float(close.iloc[-121]) - 1) * 100
+                drawdown_52w = (last_close / high_52w - 1) * 100
+            if len(close) >= 21:
+                return20 = (
+                    last_close / float(close.iloc[-21]) - 1
+                ) * 100
+            if len(close) >= 61:
+                return60 = (
+                    last_close / float(close.iloc[-61]) - 1
+                ) * 100
+            if len(close) >= 121:
+                return120 = (
+                    last_close / float(close.iloc[-121]) - 1
+                ) * 100
+            if len(close) >= 20:
+                sma20 = float(close.rolling(20).mean().iloc[-1])
+                above_sma20 = last_close > sma20
+            if len(close) >= 50:
+                sma50 = float(close.rolling(50).mean().iloc[-1])
+                above_sma50 = last_close > sma50
 
-        revision_net_90d = None
-        upgrades_90d = None
-        downgrades_90d = None
-
-        try:
-            revisions = stock.upgrades_downgrades
-        except Exception:
-            revisions = None
-
-        if revisions is not None and not revisions.empty:
-            dates = pd.to_datetime(revisions.index, errors="coerce")
-            try:
-                if getattr(dates, "tz", None) is None:
-                    dates = dates.tz_localize("UTC")
-                else:
-                    dates = dates.tz_convert("UTC")
-                cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=90)
-                recent = revisions.loc[list(dates >= cutoff)]
-            except Exception:
-                recent = pd.DataFrame()
-
-            action_col = next(
-                (col for col in recent.columns if str(col).lower() == "action"),
-                None,
-            )
-            if action_col is not None:
-                actions = (
-                    recent[action_col].fillna("").astype(str).str.lower().tolist()
-                )
-                upgrades_90d = sum(
-                    "upgrade" in action or action.strip() == "up"
-                    for action in actions
-                )
-                downgrades_90d = sum(
-                    "downgrade" in action or action.strip() == "down"
-                    for action in actions
-                )
-                revision_net_90d = upgrades_90d - downgrades_90d
+        revisions = estimate_revision_data(stock)
 
         return {
             "ticker": ticker,
@@ -668,48 +805,48 @@ def get_stock_data(ticker):
             "return20": return20,
             "return60": return60,
             "return120": return120,
+            "above_sma20": above_sma20,
+            "above_sma50": above_sma50,
+            "return20_positive": return20 > 0 if return20 is not None else None,
             "analyst_count": number("numberOfAnalystOpinions"),
             "recommendation_mean": number("recommendationMean"),
             "analyst_upside": analyst_upside,
-            "revision_net_90d": revision_net_90d,
-            "upgrades_90d": upgrades_90d,
-            "downgrades_90d": downgrades_90d,
+            **revisions,
         }
     except Exception:
         return None
 
 
+# ============================================================
+# LONG FILTERJI IN OCENA
+# ============================================================
+
 def liquidity_reasons(data):
-    """Pove natančno, kateri likvidnostni podatek manjka ali ne doseže praga."""
     reasons = []
+
     market_cap = data.get("market_cap")
     dollar_volume = data.get("dollar_volume")
-    price = data.get("price")
-    average_volume = data.get("average_volume")
 
     if market_cap is None:
-        reasons.append("Yahoo Finance ni vrnil podatka o market capu")
+        reasons.append("Yahoo Finance ni vrnil market cap podatka")
     elif market_cap < MIN_MARKET_CAP:
         reasons.append(
-            f"market cap je {market_cap / 1_000_000_000:.2f}B USD; "
-            "zahtevan prag je 2.00B USD"
+            f"market cap {market_cap / 1_000_000_000:.2f}B USD je pod "
+            "pragom 2.00B USD"
         )
 
     if dollar_volume is None:
         missing = []
-        if price is None:
+        if data.get("price") is None:
             missing.append("cena")
-        if average_volume is None:
+        if data.get("average_volume") is None:
             missing.append("povprečni volumen")
-        reasons.append(
-            "dolarskega prometa ni mogoče izračunati"
-            + (f" (manjka: {', '.join(missing)})" if missing else "")
-        )
+        detail = f" (manjka: {', '.join(missing)})" if missing else ""
+        reasons.append("dolarskega prometa ni mogoče izračunati" + detail)
     elif dollar_volume < MIN_DOLLAR_VOLUME:
         reasons.append(
-            f"povprečni dolarski promet je "
-            f"{dollar_volume / 1_000_000:.2f}M USD; "
-            "zahtevan prag je 20.00M USD"
+            f"povprečni dolarski promet {dollar_volume / 1_000_000:.2f}M USD "
+            "je pod pragom 20.00M USD"
         )
 
     return reasons
@@ -721,49 +858,46 @@ def is_liquid(data):
 
 def get_multiple(data):
     name = SECTOR_MULTIPLE.get(data["sector"])
-    keys = {"P/S": "ps", "P/B": "pb", "EV/EBITDA": "ev_ebitda"}
-    value = safe_float(data.get(keys.get(name, "")))
+    source_key = {"P/S": "ps", "P/B": "pb", "EV/EBITDA": "ev_ebitda"}.get(name)
+    value = safe_float(data.get(source_key)) if source_key else None
 
     if value is None or value <= 0:
         value = None
-
     return {"name": name or "NI PODATKA", "value": value}
 
 
 def quality_score(data):
-    parts = []
+    components = []
 
     years = data.get("fcf_years", 0)
     if years >= 3:
-        parts.append((data["positive_fcf_years"] / years * 10, 0.25))
+        components.append((data["positive_fcf_years"] / years * 10, 0.25))
 
     margin = data.get("median_fcf_margin")
     if margin is not None:
-        parts.append((max(0.0, min(10.0, margin / 2)), 0.25))
+        components.append((max(0.0, min(10.0, margin / 2)), 0.25))
 
     conversion = data.get("median_conversion")
     if conversion is not None:
-        parts.append((max(0.0, min(10.0, conversion * 5)), 0.20))
+        components.append((max(0.0, min(10.0, conversion * 5)), 0.20))
 
     sbc = data.get("median_sbc")
     if sbc is not None:
-        parts.append((max(0.0, min(10.0, 10 - sbc / 2)), 0.15))
+        components.append((max(0.0, min(10.0, 10 - sbc / 2)), 0.15))
 
     net_cash = data.get("net_cash")
     if net_cash is not None:
-        parts.append((8.0 if net_cash >= 0 else 3.0, 0.15))
+        components.append((8.0 if net_cash >= 0 else 3.0, 0.15))
 
-    if len(parts) < 4:
+    if len(components) < 4:
         return None
 
-    total_weight = sum(weight for _, weight in parts)
-    if total_weight <= 0:
+    weight_sum = sum(weight for _, weight in components)
+    if weight_sum <= 0:
         return None
 
-    return round(
-        sum(value * weight for value, weight in parts) / total_weight,
-        1,
-    )
+    score = sum(value * weight for value, weight in components) / weight_sum
+    return round(max(0.0, min(10.0, score)), 1)
 
 
 def long_filter_reasons(data):
@@ -805,15 +939,15 @@ def long_filter_reasons(data):
         elif abs(data["net_cash"]) / ebitda > 2.5:
             reasons.append("net debt/EBITDA presega 2,5x")
     if data.get("drawdown_52w") is None:
-        reasons.append("ni dovolj zgodovine cene za izračun 52w padca")
+        reasons.append("ni dovolj podatkov za izračun padca od 52w vrha")
     if data.get("return20") is None or data.get("return60") is None:
-        reasons.append("ni dovolj zgodovine za 20d/60d zagon")
+        reasons.append("ni dovolj zgodovine za izračun 20d/60d zagona")
 
     return reasons
 
 
 def coverage_score(data):
-    fields = [
+    checks = [
         data.get("price") is not None,
         data.get("market_cap") is not None,
         data.get("dollar_volume") is not None,
@@ -825,7 +959,7 @@ def coverage_score(data):
         data.get("net_cash") is not None,
         data.get("latest_fcf") is not None,
     ]
-    return round(sum(fields) / len(fields) * 100)
+    return round(sum(checks) / len(checks) * 100)
 
 
 def drawdown_score(drawdown):
@@ -866,7 +1000,7 @@ def momentum_score(return20, return60, return120):
 
 
 def analyst_revision_score(data):
-    net = data.get("revision_net_90d")
+    net = data.get("eps_revision_net_30d")
     if net is None:
         return None
     return round(max(0.0, min(10.0, 5.0 + net)), 1)
@@ -878,13 +1012,13 @@ def scan_long(universe):
     errors = []
 
     with ThreadPoolExecutor(max_workers=6) as pool:
-        tasks = {
+        futures = {
             pool.submit(get_stock_data, ticker): ticker
             for ticker in universe
         }
 
-        for future in as_completed(tasks):
-            ticker = tasks[future]
+        for future in as_completed(futures):
+            ticker = futures[future]
             try:
                 data = future.result()
                 if data:
@@ -920,7 +1054,9 @@ def scan_long(universe):
             candidate["drawdown_score"] is None
             or candidate["momentum_score"] is None
         ):
-            candidate["reasons"].append("manjka podatek za oceno padca ali zagona")
+            candidate["reasons"].append(
+                "manjka podatek za oceno padca ali zagona"
+            )
             continue
 
         peers = [
@@ -958,7 +1094,9 @@ def scan_long(universe):
         )
 
         if valuation_pct is None or fcf_pct is None or growth_pct is None:
-            candidate["reasons"].append("premalo podatkov za peer percentile")
+            candidate["reasons"].append(
+                "premalo podatkov za sektorske percentile"
+            )
             continue
 
         candidate["peer_count"] = len(peers)
@@ -976,13 +1114,16 @@ def scan_long(universe):
         if candidate["revision_score"] is not None:
             components.append((candidate["revision_score"] * 10, 0.10))
 
-        weight_sum = sum(weight for _, weight in components)
-        if weight_sum <= 0:
+        total_weight = sum(weight for _, weight in components)
+        if total_weight <= 0:
             continue
 
-        raw_score = sum(value * weight for value, weight in components) / weight_sum
+        raw_score = (
+            sum(value * weight for value, weight in components)
+            / total_weight
+        )
         candidate["asymmetry_score"] = round(raw_score / 10, 1)
-        candidate["score_coverage"] = round(weight_sum * 100)
+        candidate["score_coverage"] = round(total_weight * 100)
         ranked.append(candidate)
 
     ranked.sort(
@@ -994,6 +1135,7 @@ def scan_long(universe):
         ),
         reverse=True,
     )
+
     return ranked, {row["ticker"]: row for row in records}, errors
 
 
@@ -1011,7 +1153,11 @@ def sector_relative_returns(ticker, sector):
             progress=False,
             threads=False,
         )
-        if frame is None or frame.empty or not isinstance(frame.columns, pd.MultiIndex):
+        if (
+            frame is None
+            or frame.empty
+            or not isinstance(frame.columns, pd.MultiIndex)
+        ):
             return None, None
 
         close = frame["Close"]
@@ -1043,6 +1189,71 @@ def sector_relative_returns(ticker, sector):
         return None, None
 
 
+def calculate_saas_breadth(records):
+    members = [
+        ticker for ticker in SECTOR_GROUPS["SaaS / Software"]
+        if ticker in AI_UNIVERSE
+    ]
+    available = [records[ticker] for ticker in members if ticker in records]
+
+    valid20 = [
+        row for row in available
+        if row.get("return20_positive") is not None
+    ]
+    valid_sma20 = [
+        row for row in available
+        if row.get("above_sma20") is not None
+    ]
+    valid_sma50 = [
+        row for row in available
+        if row.get("above_sma50") is not None
+    ]
+
+    def percent_true(rows, field):
+        if not rows:
+            return None
+        return 100 * sum(bool(row[field]) for row in rows) / len(rows)
+
+    revision_rows = [
+        row for row in available
+        if row.get("eps_revision_net_30d") is not None
+    ]
+    trend_rows = [
+        row for row in available
+        if row.get("eps_estimate_change_30d_pct") is not None
+    ]
+
+    positive_revision_share = None
+    if revision_rows:
+        positive_revision_share = (
+            100 * sum(row["eps_revision_net_30d"] > 0 for row in revision_rows)
+            / len(revision_rows)
+        )
+
+    mean_estimate_change = None
+    if trend_rows:
+        mean_estimate_change = sum(
+            row["eps_estimate_change_30d_pct"] for row in trend_rows
+        ) / len(trend_rows)
+
+    return {
+        "universe_count": len(members),
+        "positive_20d_count": sum(
+            row["return20_positive"] for row in valid20
+        ),
+        "positive_20d_coverage": len(valid20),
+        "positive_20d_pct": percent_true(valid20, "return20_positive"),
+        "above_sma20_pct": percent_true(valid_sma20, "above_sma20"),
+        "above_sma50_pct": percent_true(valid_sma50, "above_sma50"),
+        "sma20_coverage": len(valid_sma20),
+        "sma50_coverage": len(valid_sma50),
+        "revision_coverage": len(revision_rows),
+        "positive_revision_share": positive_revision_share,
+        "mean_eps_estimate_change": mean_estimate_change,
+        "eps_trend_coverage": len(trend_rows),
+    }
+
+
 # ============================================================
 # ATR
 # ============================================================
@@ -1072,14 +1283,14 @@ def get_atr(ticker):
             axis=1,
         ).max(axis=1)
 
-        result = safe_float(true_range.rolling(14).mean().iloc[-1])
-        return result if result is not None and result > 0 else None
+        value = safe_float(true_range.rolling(14).mean().iloc[-1])
+        return value if value is not None and value > 0 else None
     except Exception:
         return None
 
 
 # ============================================================
-# INTRADAY PODATKI IN REVERSAL
+# INTRADAY REVERSAL
 # ============================================================
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -1094,11 +1305,11 @@ def get_intraday_history(ticker):
         if frame is None or frame.empty:
             return None
 
-        required = ["Open", "High", "Low", "Close", "Volume"]
-        if any(column not in frame.columns for column in required):
+        needed = ["Open", "High", "Low", "Close", "Volume"]
+        if any(column not in frame.columns for column in needed):
             return None
 
-        frame = frame.dropna(subset=required).copy()
+        frame = frame.dropna(subset=needed).copy()
         if frame.empty:
             return None
 
@@ -1120,18 +1331,20 @@ def session_bars(frame, date_value, session):
     if frame is None or frame.empty:
         return pd.DataFrame()
 
-    day = frame[[stamp.date() == date_value for stamp in frame.index]]
+    same_day = frame[
+        [stamp.date() == date_value for stamp in frame.index]
+    ]
     if session == "premarket":
-        return day.between_time("04:00", "09:29")
-    return day.between_time("09:30", "15:59")
+        return same_day.between_time("04:00", "09:29")
+    return same_day.between_time("09:30", "15:59")
 
 
 def previous_regular_close(frame, date_value):
-    dates = sorted(
+    prior_dates = sorted(
         {stamp.date() for stamp in frame.index if stamp.date() < date_value},
         reverse=True,
     )
-    for prior_date in dates:
+    for prior_date in prior_dates:
         bars = session_bars(frame, prior_date, "regular")
         if not bars.empty:
             value = safe_float(bars["Close"].iloc[-1])
@@ -1140,7 +1353,7 @@ def previous_regular_close(frame, date_value):
     return None
 
 
-def calculate_vwap(bars):
+def session_vwap(bars):
     typical = (
         bars["High"].astype(float)
         + bars["Low"].astype(float)
@@ -1158,26 +1371,26 @@ def same_time_volume_ratio(frame, stamp, bars, index):
 
     session = "premarket" if stamp.time() < time(9, 30) else "regular"
     clock = stamp.strftime("%H:%M")
-    previous_dates = sorted({
+    prior_dates = sorted({
         item.date() for item in frame.index if item.date() < stamp.date()
     })[-5:]
 
-    old_volumes = []
-    for prior_date in previous_dates:
+    historical = []
+    for prior_date in prior_dates:
         prior = session_bars(frame, prior_date, session)
         matches = [
             item for item in prior.index
             if item.strftime("%H:%M") == clock
         ]
         if matches:
-            value = safe_float(prior.loc[matches[-1], "Volume"])
-            if value is not None and value > 0:
-                old_volumes.append(value)
+            volume = safe_float(prior.loc[matches[-1], "Volume"])
+            if volume is not None and volume > 0:
+                historical.append(volume)
 
-    if not old_volumes:
+    if not historical:
         return None
 
-    baseline = float(pd.Series(old_volumes).median())
+    baseline = float(pd.Series(historical).median())
     return current / baseline if baseline > 0 else None
 
 
@@ -1186,33 +1399,33 @@ def calculate_rsi(values, period=14):
     if len(close) < period + 1:
         return None
 
-    change = close.diff()
-    gains = change.clip(lower=0).rolling(period).mean().iloc[-1]
-    losses = (-change.clip(upper=0)).rolling(period).mean().iloc[-1]
+    delta = close.diff()
+    gains = delta.clip(lower=0).rolling(period).mean().iloc[-1]
+    losses = (-delta.clip(upper=0)).rolling(period).mean().iloc[-1]
 
     if pd.isna(gains) or pd.isna(losses):
         return None
     if losses == 0:
         return 100.0 if gains > 0 else 50.0
 
-    rs = gains / losses
-    return float(100 - 100 / (1 + rs))
+    relative_strength = gains / losses
+    return float(100 - 100 / (1 + relative_strength))
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def earnings_clear(ticker, days=5):
-    """True: brez earnings v obdobju; None: preverjanje ni bilo mogoče."""
+    """True: earnings niso v oknu; None: datuma ni bilo mogoče preveriti."""
     try:
-        earnings = yf.Ticker(ticker).get_earnings_dates(limit=8)
-        if earnings is None or len(earnings) == 0:
+        dates = yf.Ticker(ticker).get_earnings_dates(limit=8)
+        if dates is None or len(dates) == 0:
             return None
 
         today = datetime.now(NY_TZ).date()
-        for raw_date in earnings.index:
-            value = pd.Timestamp(raw_date)
-            if value.tzinfo is not None:
-                value = value.tz_convert(None)
-            difference = (value.date() - today).days
+        for raw_date in dates.index:
+            date_value = pd.Timestamp(raw_date)
+            if date_value.tzinfo is not None:
+                date_value = date_value.tz_convert(None)
+            difference = (date_value.date() - today).days
             if 0 <= difference <= days:
                 return False
         return True
@@ -1227,19 +1440,20 @@ def reversal_signal(ticker, frame, now=None):
     if frame is None or frame.empty:
         return None
 
-    today_frame = frame[[stamp.date() == today for stamp in frame.index]]
+    today_frame = frame[
+        [stamp.date() == today for stamp in frame.index]
+    ]
     if today_frame.empty:
         return None
 
-    # Uporabi samo petminutne sveče, ki so se že zaključile.
     completed = today_frame[
         [stamp + timedelta(minutes=5) <= now for stamp in today_frame.index]
     ]
     if completed.empty:
         return None
 
-    latest_stamp = completed.index[-1]
-    session = "premarket" if latest_stamp.time() < time(9, 30) else "regular"
+    last_stamp = completed.index[-1]
+    session = "premarket" if last_stamp.time() < time(9, 30) else "regular"
     bars = session_bars(frame, today, session)
     bars = bars[
         [stamp + timedelta(minutes=5) <= now for stamp in bars.index]
@@ -1252,23 +1466,23 @@ def reversal_signal(ticker, frame, now=None):
     if prior_close is None or earnings_clear(ticker, 5) is not True:
         return None
 
-    vwap = calculate_vwap(bars)
-    matches = []
+    vwap = session_vwap(bars)
+    signals = []
 
     for index in range(14, len(bars)):
         stamp = bars.index[index]
         close = safe_float(bars["Close"].iloc[index])
         candle_open = safe_float(bars["Open"].iloc[index])
-        prior_bar_close = safe_float(bars["Close"].iloc[index - 1])
+        previous_bar_close = safe_float(bars["Close"].iloc[index - 1])
         current_vwap = safe_float(vwap.iloc[index])
-        prior_vwap = safe_float(vwap.iloc[index - 1])
+        previous_vwap = safe_float(vwap.iloc[index - 1])
 
         values = (
             close,
             candle_open,
-            prior_bar_close,
+            previous_bar_close,
             current_vwap,
-            prior_vwap,
+            previous_vwap,
         )
         if any(value is None for value in values):
             continue
@@ -1283,18 +1497,21 @@ def reversal_signal(ticker, frame, now=None):
             if reference is None or reference <= 0:
                 continue
 
-        rel_open = (close / reference - 1) * 100
-        if not -8.0 <= rel_open <= -1.0:
+        relative_open = (close / reference - 1) * 100
+        if not -8.0 <= relative_open <= -1.0:
             continue
 
-        reclaim = prior_bar_close <= prior_vwap and close > current_vwap
-        rel_vwap = (close / current_vwap - 1) * 100
-        if not reclaim or close <= candle_open or rel_vwap < -2.0:
+        vwap_reclaim = (
+            previous_bar_close <= previous_vwap and close > current_vwap
+        )
+        relative_vwap = (close / current_vwap - 1) * 100
+
+        if not vwap_reclaim or close <= candle_open or relative_vwap < -2.0:
             continue
 
         rsi = calculate_rsi(bars["Close"].iloc[:index + 1])
         volume_ratio = same_time_volume_ratio(frame, stamp, bars, index)
-        momentum = (close / prior_bar_close - 1) * 100
+        momentum = (close / previous_bar_close - 1) * 100
 
         if rsi is None or rsi >= 35:
             continue
@@ -1312,21 +1529,21 @@ def reversal_signal(ticker, frame, now=None):
         if score < 6.0:
             continue
 
-        matches.append({
+        signals.append({
             "Ticker": ticker,
             "Čas": stamp.strftime("%H:%M ET"),
             "Seja": "PREMARKET" if session == "premarket" else "REDNA SEJA",
             "Cena": round(close, 2),
-            "Rel. open %": round(rel_open, 2),
+            "Rel. open %": round(relative_open, 2),
             "VWAP": round(current_vwap, 2),
-            "Rel. VWAP %": round(rel_vwap, 2),
+            "Rel. VWAP %": round(relative_vwap, 2),
             "Volumen / ista ura x": round(volume_ratio, 2),
             "RSI 5m": round(rsi, 1),
             "Momentum %": round(momentum, 2),
             "Ocena filtra": score,
         })
 
-    return matches[-1] if matches else None
+    return signals[-1] if signals else None
 
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -1343,12 +1560,12 @@ def scan_reversals(universe):
         except Exception:
             continue
 
-    results.sort(key=lambda item: item["Ocena filtra"], reverse=True)
+    results.sort(key=lambda row: row["Ocena filtra"], reverse=True)
     return results[:5]
 
 
 # ============================================================
-# GEMINI KOMENTAR
+# GEMINI
 # ============================================================
 
 def ask_gemini(api_key, prompt):
@@ -1363,22 +1580,22 @@ def ask_gemini(api_key, prompt):
     )
     listing.raise_for_status()
 
-    models = [
+    model_names = [
         item["name"].split("/")[-1]
         for item in listing.json().get("models", [])
         if "generateContent" in item.get("supportedGenerationMethods", [])
     ]
-    if not models:
+    if not model_names:
         raise RuntimeError("API ni vrnil modela za generateContent.")
 
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     last_error = "Klic API-ja ni uspel."
 
-    for model in models:
+    for model_name in model_names:
         try:
             url = (
                 "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{model}:generateContent"
+                f"{model_name}:generateContent"
             )
             response = requests.post(
                 url,
@@ -1386,6 +1603,7 @@ def ask_gemini(api_key, prompt):
                 json=payload,
                 timeout=35,
             )
+
             if response.status_code == 200:
                 parts = (
                     response.json()
@@ -1399,10 +1617,10 @@ def ask_gemini(api_key, prompt):
                     if part.get("text")
                 )
                 if text:
-                    return model, text
+                    return model_name, text
 
             last_error = (
-                f"{model}: HTTP {response.status_code} "
+                f"{model_name}: HTTP {response.status_code} "
                 f"{response.text[:250]}"
             )
         except Exception as error:
@@ -1412,10 +1630,11 @@ def ask_gemini(api_key, prompt):
 
 
 # ============================================================
-# IZRIS STRANI IN OSVEŽEVANJE
+# GLAVNI PRIKAZ
 # ============================================================
 
 now_ljubljana = datetime.now(LJ_TZ)
+
 st.markdown(
     f"""
     <div style="border-bottom:1px solid rgba(255,255,255,.08);
@@ -1434,7 +1653,8 @@ st.markdown(
 
 st.title("Value Ledger 2.0")
 st.caption(
-    "Ocene so presejalni pripomoček, ne napoved donosa. Aplikacija ne oddaja naročil."
+    "Ocene so presejalni pripomoček, ne napoved donosa. "
+    "Aplikacija ne oddaja naročil."
 )
 
 st.sidebar.markdown("### Nastavitve")
@@ -1456,7 +1676,7 @@ if st.button("Osveži skene"):
     earnings_clear.clear()
     st.rerun()
 
-with st.spinner("Nalagam tržni režim in sektorske podatke..."):
+with st.spinner("Nalagam tržni režim in sektorsko relativno moč..."):
     market = get_market_regime()
     rotation = get_rotation()
 
@@ -1474,7 +1694,7 @@ progress = st.progress(0, text="Začenjam skeniranje...")
 try:
     with st.spinner("Skeniram fundamentals in intraday podatke..."):
         long_candidates, audit, scan_errors = scan_long(tuple(AI_UNIVERSE))
-        progress.progress(60, text="Fundamentalni pregled končan; preverjam intraday...")
+        progress.progress(60, text="Fundamentalni sken končan; preverjam intraday...")
         reversal_candidates = scan_reversals(tuple(AI_UNIVERSE))
         progress.progress(100, text="Skeniranje končano.")
 except Exception as error:
@@ -1487,10 +1707,11 @@ if scan_errors:
 
 best_long = long_candidates[0] if long_candidates else None
 best_reversal = reversal_candidates[0] if reversal_candidates else None
+breadth = calculate_saas_breadth(audit)
 
 
 # ============================================================
-# DINAMIČNI KARTICI
+# DINAMIČNI ZLATI LONG IN ZELENI REVERSAL KARTICI
 # ============================================================
 
 left, right = st.columns(2)
@@ -1510,10 +1731,10 @@ with left:
                 ASIMETRIČNI LONG · HEVRISTIČNA RAZVRSTITEV
               </div>
               <div style="font-size:1.55rem;font-weight:700;color:#FFFFFF;margin-top:5px;">
-                {item["ticker"]}
+                {html.escape(item["ticker"])}
               </div>
               <div style="color:#CBD5E1;font-size:.86rem;margin-top:2px;">
-                {item["name"]} · {item["sector"]}
+                {html.escape(item["name"])} · {html.escape(item["sector"])}
               </div>
               <div style="color:#F8FAFC;font-size:1rem;margin-top:10px;">
                 Cena {fmt(item["price"])} · Ocena {item["asymmetry_score"]}/10
@@ -1544,7 +1765,7 @@ with left:
                 NI STROGEGA KANDIDATA
               </div>
               <div style="color:#CBD5E1;font-size:.82rem;margin-top:10px;">
-                Kandidat mora prestati finančne filtre, imeti ustrezne podatke
+                Kandidat mora prestati finančne filtre, imeti uporabne podatke
                 in vsaj pet primerljivih peerjev.
               </div>
             </div>
@@ -1562,10 +1783,10 @@ with right:
                 INTRADAY REVERSAL · UJEMANJE S FILTRI, NE NAPOVED
               </div>
               <div style="font-size:1.55rem;font-weight:700;color:#FFFFFF;margin-top:5px;">
-                {item["Ticker"]}
+                {html.escape(item["Ticker"])}
               </div>
               <div style="color:#CBD5E1;font-size:.86rem;margin-top:2px;">
-                {item["Seja"]} · {item["Čas"]}
+                {html.escape(item["Seja"])} · {html.escape(item["Čas"])}
               </div>
               <div style="color:#F8FAFC;font-size:1rem;margin-top:10px;">
                 Cena {item["Cena"]} · Ocena filtra {item["Ocena filtra"]}/10
@@ -1599,13 +1820,13 @@ with right:
         )
 
 st.caption(
-    "MNDY in TSM se primerjata z različnimi sektorskimi peerji; njuna "
-    "percentila ne dokazujeta, katera ima večji prihodnji upside."
+    "MNDY in TSM se primerjata z različnimi sektorskimi peerji. "
+    "Njuna percentila sama ne dokazujeta, katera ima večji prihodnji upside."
 )
 
 
 # ============================================================
-# CAPITAL ROTATION RADAR
+# CAPITAL ROTATION RADAR IN NOVA SAAS ŠIRINA
 # ============================================================
 
 st.subheader("Capital Rotation Radar")
@@ -1613,271 +1834,17 @@ st.subheader("Capital Rotation Radar")
 rotation_html = (
     "<div class='ledger-card'>"
     "<div style='color:#FBBF24;font-weight:700;font-size:1rem;'>"
-    + rotation["rotation"]
+    + html.escape(rotation["rotation"])
     + "</div><div style='color:#94A3B8;font-size:.82rem;margin-top:6px;'>"
-    + "Tržni režim: " + market["regime"] + "</div>"
+    + "Tržni režim: " + html.escape(market["regime"]) + "</div>"
 )
 
 if rotation["detail"]:
     rotation_html += (
         "<div style='color:#94A3B8;font-size:.82rem;margin-top:6px;'>"
-        + rotation["detail"]
+        + html.escape(rotation["detail"])
         + "</div>"
     )
 
 rotation_html += "</div>"
-st.markdown(rotation_html, unsafe_allow_html=True)
-
-if rotation["rows"]:
-    render_table(pd.DataFrame(rotation["rows"]))
-else:
-    st.info("Sektorski podatki trenutno niso na voljo.")
-
-st.caption(
-    "ETF relativna moč meri cenovno gibanje, ne neposrednih tokov kapitala "
-    "ali zgodovinskih sprememb sentimenta."
-)
-
-
-# ============================================================
-# TOP 5 LONG
-# ============================================================
-
-st.subheader("TOP 5 Long · kakovost, vrednotenje, padec in obrat")
-st.caption(
-    "Padec od 52-tedenskega vrha prispeva k oceni šele po temeljnih filtrih. "
-    "Peer multiple ni zgodovinsko vrednotenje podjetja."
-)
-
-if long_candidates:
-    rows = []
-
-    for item in long_candidates[:5]:
-        fcf_yield = (
-            item["latest_fcf"] / item["market_cap"] * 100
-            if item["market_cap"] and item["latest_fcf"] is not None
-            else None
-        )
-        rel20, rel60 = sector_relative_returns(item["ticker"], item["sector"])
-
-        rows.append({
-            "Ticker": item["ticker"],
-            "Podjetje": item["name"],
-            "Sektor": item["sector"],
-            "Peerji": item["peer_count"],
-            "Asimetrija / 10": item["asymmetry_score"],
-            "Kakovost FCF / 10": item["quality"],
-            "FCF peer percentil": item["fcf_percentile"],
-            "Multiple": item["multiple"]["name"],
-            "Vrednost multipla": fmt(item["multiple"]["value"]),
-            "Vrednotenje peer percentil": item["valuation_percentile"],
-            "Rast prihodkov %": fmt(item["growth"] * 100, 1, "%"),
-            "Rastni peer percentil": item["growth_percentile"],
-            "FCF pozitivna leta": (
-                f"{item['positive_fcf_years']}/{item['fcf_years']}"
-            ),
-            "Mediana FCF marže %": fmt(item["median_fcf_margin"], 1, "%"),
-            "CFO / čisti dobiček": fmt(item["median_conversion"], 2, "x"),
-            "SBC / prihodki %": fmt(item["median_sbc"], 1, "%"),
-            "FCF yield %": fmt(fcf_yield, 1, "%"),
-            "Padec od 52w vrha %": fmt(item["drawdown_52w"], 1, "%"),
-            "Donos 20d %": fmt(item["return20"], 1, "%"),
-            "Rel. donos vs sektor 20d %": fmt(rel20, 1, "%"),
-            "Rel. donos vs sektor 60d %": fmt(rel60, 1, "%"),
-            "WS neto revizije 90d": fmt(item["revision_net_90d"], 0),
-            "WS trenutno priporočilo": fmt(item["recommendation_mean"], 2),
-            "WS ciljna rast %": fmt(item["analyst_upside"], 1, "%"),
-            "Pokritost polj / 100": item["coverage"],
-        })
-
-    render_table(pd.DataFrame(rows))
-else:
-    st.info(
-        "Ni kandidata, ki bi prestal filtre in imel dovolj primerljivih peerjev."
-    )
-
-st.caption(
-    "V tem skenerju ni zanesljive zgodovine P/S ali EV/EBITDA, zato se "
-    "ne sklepa, da je delnica poceni glede na lastno večletno vrednotenje. "
-    "Trenutna ciljna cena analitikov ni zgodovinski sentiment."
-)
-
-
-# ============================================================
-# RAZLOGI ZA MNDY IN PRIMERJAVA Z NAJBOLJŠIM LONGOM
-# ============================================================
-
-st.subheader("MNDY proti najbolje uvrščenemu Long kandidatu")
-
-comparison_tickers = ["MNDY"]
-if best_long and best_long["ticker"] != "MNDY":
-    comparison_tickers.append(best_long["ticker"])
-
-comparison_rows = []
-
-for ticker in comparison_tickers:
-    data = audit.get(ticker)
-    if not data:
-        continue
-
-    ranked = next(
-        (row for row in long_candidates if row["ticker"] == ticker),
-        None,
-    )
-
-    if ranked:
-        ranking = f"{ranked['asymmetry_score']}/10"
-        valuation_pct = ranked.get("valuation_percentile")
-        fcf_pct = ranked.get("fcf_percentile")
-        growth_pct = ranked.get("growth_percentile")
-        peer_count = ranked.get("peer_count")
-    else:
-        ranking = "NI UVRŠČEN"
-        valuation_pct = None
-        fcf_pct = None
-        growth_pct = None
-        peer_count = None
-
-    fcf_yield = (
-        data["latest_fcf"] / data["market_cap"] * 100
-        if data.get("market_cap") and data.get("latest_fcf") is not None
-        else None
-    )
-    growth = data.get("growth")
-    rel20, rel60 = sector_relative_returns(ticker, data["sector"])
-
-    comparison_rows.append({
-        "Ticker": ticker,
-        "Podjetje": data["name"],
-        "Sektor": data["sector"],
-        "Cena": fmt(data.get("price")),
-        "P/S": fmt(data.get("ps")),
-        "EV/EBITDA": fmt(data.get("ev_ebitda")),
-        "FCF yield %": fmt(fcf_yield, 1, "%"),
-        "Rast prihodkov %": fmt(
-            growth * 100 if growth is not None else None, 1, "%"
-        ),
-        "Kakovost FCF / 10": fmt(quality_score(data), 1),
-        "Padec od 52w vrha %": fmt(data.get("drawdown_52w"), 1, "%"),
-        "Donos 20d %": fmt(data.get("return20"), 1, "%"),
-        "Rel. donos vs sektor 20d %": fmt(rel20, 1, "%"),
-        "Rel. donos vs sektor 60d %": fmt(rel60, 1, "%"),
-        "WS neto revizije 90d": fmt(data.get("revision_net_90d"), 0),
-        "WS priporočilo": fmt(data.get("recommendation_mean"), 2),
-        "Uvrstitev": ranking,
-        "Vrednotenje peer percentil": valuation_pct,
-        "FCF peer percentil": fcf_pct,
-        "Rastni peer percentil": growth_pct,
-        "Peerji": peer_count,
-        "Pokritost polj": f"{coverage_score(data)}/100",
-    })
-
-if comparison_rows:
-    render_table(pd.DataFrame(comparison_rows))
-else:
-    st.info("Za MNDY in najbolje uvrščenega kandidata ni dovolj podatkov.")
-
-mndy = audit.get("MNDY")
-if mndy:
-    reasons = mndy.get("reasons", [])
-    if reasons:
-        st.warning("MNDY ne prestane vseh trenutnih Long filtrov:")
-        for reason in reasons:
-            st.write(f"- {reason}")
-    elif not any(row["ticker"] == "MNDY" for row in long_candidates):
-        st.info(
-            "MNDY je prestal finančne filtre, vendar se ni uvrstil. "
-            "Preveri število peerjev in razpoložljivost primerjalnih podatkov."
-        )
-else:
-    st.info("Yahoo Finance trenutno ni vrnil dovolj podatkov za MNDY.")
-
-
-# ============================================================
-# TOP 5 INTRADAY REVERSAL
-# ============================================================
-
-st.subheader("TOP 5 Intraday Reversal")
-st.caption(
-    "Premarket in redna seja uporabljata ločena VWAP-a. Filter zahteva "
-    "padec 1–8 %, VWAP reclaim, zeleno svečo, RSI pod 35, volumen vsaj "
-    "1,3× glede na isto uro, pozitiven momentum in preverjene earnings."
-)
-
-if reversal_candidates:
-    render_table(pd.DataFrame(reversal_candidates))
-else:
-    st.info(
-        "NI STROGEGA KANDIDATA. Noben ticker trenutno ne prestane vseh "
-        "intraday filtrov."
-    )
-
-st.warning(
-    "Premarket je lahko manj likviden. Yahoo Finance lahko vrne zakasnjene "
-    "ali nepopolne podatke; signal ni zagotovilo donosa."
-)
-
-
-# ============================================================
-# GEMINI ANALITIK
-# ============================================================
-
-st.subheader("Avtonomni AI analitik")
-st.caption(
-    "AI komentar naj uporabi prikazane meritve in ne ugiba manjkajočih "
-    "podatkov ali prihodnjih donosov."
-)
-
-if st.button("Zaženi AI komentar trga"):
-    if not api_key:
-        st.error("Vnesi Gemini API ključ.")
-    else:
-        long_context = [
-            {
-                "ticker": row["ticker"],
-                "sector": row["sector"],
-                "score": row["asymmetry_score"],
-                "fcf_quality": row["quality"],
-                "multiple": row["multiple"],
-                "valuation_percentile": row["valuation_percentile"],
-                "drawdown_52w": row["drawdown_52w"],
-                "return20": row["return20"],
-                "analyst_revision_net_90d": row["revision_net_90d"],
-                "peer_count": row["peer_count"],
-            }
-            for row in long_candidates[:5]
-        ]
-
-        prompt = f"""
-Odgovori v slovenščini in uporabljaj samo spodnje podatke.
-Ne izmišljaj si cen, novic, zgodovinskega vrednotenja ali donosov.
-
-ETF relativna moč je cenovni približek, ne neposredna meritev tokov kapitala.
-Trenutno priporočilo analitikov ni zgodovinski trend sentimenta.
-Ocene so hevristične, ne napoved donosa.
-Če ni kandidatov, napiši: NI STROGEGA KANDIDATA.
-
-Tržni režim: {market}
-Capital Rotation Radar: {rotation}
-Long kandidati: {long_context}
-MNDY: {mndy}
-Intraday kandidati: {reversal_candidates}
-
-Napiši tri kratke odstavke:
-1. Tržni režim in sektorska relativna moč.
-2. Najboljši Long po tej metodi ter omejitve primerjave z MNDY.
-3. Intraday kandidat, če obstaja, z navedenimi meritvami.
-"""
-
-        try:
-            with st.spinner("Pripravljam komentar..."):
-                model_name, report = ask_gemini(api_key, prompt)
-            st.caption(f"API model: {model_name}")
-            st.markdown(report)
-        except Exception as error:
-            st.error(f"AI komentar ni uspel: {str(error)[:400]}")
-
-st.caption(
-    "Sken se osveži ob ponovnem nalaganju strani ali s klikom na »Osveži skene«. "
-    "Aplikacija se ne osvežuje v ozadju in ne pošilja samodejnih opozoril."
-)
+st.markdown(rotation_html
