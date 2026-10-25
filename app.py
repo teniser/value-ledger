@@ -1715,3 +1715,247 @@ else:
         "NI STROGEGA KANDIDATA. Intraday oziroma premarket podatki "
         "trenutno ne izpolnjujejo vseh pogojev."
     )
+# ============================================================
+# AVTONOMNI AI ANALITIK TRGA
+# Prilepi na konec app.py
+# ============================================================
+
+def build_ai_market_context():
+    lines = [
+        "TRŽNI REŽIM:",
+        f"- Režim: {market.get('regime', 'NI PODATKA')}",
+        f"- SPY sprememba 20d: {fmt(market.get('change20'), 2, '%')}",
+        "",
+        "SEKTORSKA ROTACIJA:",
+        f"- Interpretacija IGV/SMH: {rotation.get('rotation', 'NI PODATKA')}",
+        f"- Podrobnosti: {rotation.get('detail') or 'Ni podatkov.'}",
+        "- Relativna moč ETF-jev meri gibanje cen, ne neposrednih tokov kapitala.",
+        "",
+        "SAAS ŠIRINA GIBANJA:",
+        (
+            f"- Pozitiven donos 20d: {fmt(saas.get('positive20_pct'), 1, '%')} "
+            f"({saas.get('positive20_count', 0)}/"
+            f"{saas.get('positive20_coverage', 0)} tickerjev s podatki)"
+        ),
+        (
+            f"- Nad SMA20: {fmt(saas.get('above20_pct'), 1, '%')} "
+            f"({saas.get('above20_coverage', 0)}/"
+            f"{saas.get('universe_count', 0)})"
+        ),
+        (
+            f"- Nad SMA50: {fmt(saas.get('above50_pct'), 1, '%')} "
+            f"({saas.get('above50_coverage', 0)}/"
+            f"{saas.get('universe_count', 0)})"
+        ),
+        (
+            f"- Pozitivne neto EPS-revizije v 30d: "
+            f"{fmt(saas.get('positive_revision_share'), 1, '%')} "
+            f"({saas.get('revision_coverage', 0)}/"
+            f"{saas.get('universe_count', 0)})"
+        ),
+        (
+            f"- Povprečna sprememba EPS-ocene v 30d: "
+            f"{fmt(saas.get('average_estimate_change'), 2, '%')} "
+            f"({saas.get('estimate_coverage', 0)}/"
+            f"{saas.get('universe_count', 0)})"
+        ),
+        "",
+        "NAJBOLJŠI FUNDAMENTALNI LONG KANDIDATI:",
+    ]
+
+    if long_candidates:
+        for item in long_candidates[:5]:
+            lines.append(
+                "- "
+                f"{item.get('ticker')}: ocena {fmt(item.get('asymmetry_score'), 1)}/10; "
+                f"sektor {item.get('sector')}; "
+                f"cena {fmt(item.get('price'))}; "
+                f"{item.get('multiple', {}).get('name', 'multiple')} "
+                f"{fmt(item.get('multiple', {}).get('value'))}; "
+                f"peer percentil vrednotenja "
+                f"{fmt(item.get('valuation_percentile'), 0)}; "
+                f"FCF kakovost {fmt(item.get('quality'), 1)}/10; "
+                f"rast prihodkov {fmt(item.get('growth') * 100 if item.get('growth') is not None else None, 1, '%')}; "
+                f"padec od 52w vrha {fmt(item.get('drawdown_52w'), 1, '%')}; "
+                f"EPS neto revizije 30d {fmt(item.get('eps_revision_net_30d'), 0)}."
+            )
+    else:
+        lines.append("- Ni kandidata, ki bi prestal vse Long filtre.")
+
+    lines.extend(["", "INTRADAY / PREMARKET REVERSAL KANDIDATI:"])
+
+    if reversal_candidates:
+        for item in reversal_candidates[:5]:
+            lines.append(
+                "- "
+                f"{item.get('Ticker')}: {item.get('Seja')}, "
+                f"čas {item.get('Čas')}; cena {fmt(item.get('Cena'))}; "
+                f"padec glede na prejšnji redni close "
+                f"{fmt(item.get('Rel. vs prejšnji close %'), 2, '%')}; "
+                f"relativno proti VWAP {fmt(item.get('Rel. VWAP %'), 2, '%')}; "
+                f"volumen/ista ura {fmt(item.get('Volumen / ista ura x'), 2, 'x')}; "
+                f"RSI {fmt(item.get('RSI 5m'), 1)}; "
+                f"momentum {fmt(item.get('Momentum %'), 2, '%')}; "
+                f"ocena filtra {fmt(item.get('Ocena filtra'), 1)}/10."
+            )
+    else:
+        lines.append("- Trenutno ni reversal kandidata, ki bi prestal stroge filtre.")
+
+    mndy_data = audit.get("MNDY")
+    lines.extend(["", "MNDY STATUS:"])
+    if mndy_data is None:
+        lines.append("- Podatki za MNDY niso bili pridobljeni.")
+    else:
+        mndy_ranked = next(
+            (item for item in long_candidates if item.get("ticker") == "MNDY"),
+            None,
+        )
+        if mndy_ranked:
+            lines.append(
+                f"- MNDY je uvrščen med Long kandidate z oceno "
+                f"{fmt(mndy_ranked.get('asymmetry_score'), 1)}/10."
+            )
+        else:
+            reasons = mndy_data.get("reasons") or []
+            lines.append("- MNDY trenutno ni uvrščen med Long kandidate.")
+            if reasons:
+                lines.append("- Razlogi filtrov: " + "; ".join(reasons))
+
+    return "\n".join(lines)
+
+
+def request_ai_market_analysis(api_key, context):
+    api_key = api_key.strip()
+    if not api_key:
+        raise ValueError("Vnesi Gemini API ključ.")
+
+    model_response = requests.get(
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        params={"key": api_key},
+        timeout=20,
+    )
+    model_response.raise_for_status()
+
+    available_models = [
+        model["name"].split("/")[-1]
+        for model in model_response.json().get("models", [])
+        if "generateContent" in model.get("supportedGenerationMethods", [])
+    ]
+
+    if not available_models:
+        raise RuntimeError("API ni vrnil modela, ki podpira generateContent.")
+
+    preferred = [
+        name for name in available_models
+        if name == "gemini-2.5-flash"
+    ]
+    models_to_try = preferred + [
+        name for name in available_models if name not in preferred
+    ]
+
+    prompt = f"""
+Si analitik za Value Ledger. Odgovori v slovenščini in uporabi samo
+podatke v spodnjem kontekstu.
+
+Pripravi:
+1. Kratek pregled tržnega režima.
+2. Ali podatki podpirajo zgodnjo relativno rotacijo med polprevodniki in SaaS.
+3. Kaj kaže širina SaaS gibanja: donos, SMA20, SMA50 in EPS-revizije.
+4. Največ tri Long kandidate in njihove podprte razloge.
+5. Reversal/premarket kandidate, če obstajajo, ter katere meritve jih podpirajo.
+6. Pomembne manjkajoče podatke in tveganja.
+
+Ne izmišljaj si številk, cen, Wall Street ocen, novic, denarnih tokov ali
+zgodovinskih vrednotenj. Če podatka ni, napiši »ni podatka«. Ne predstavljaj
+relativnega gibanja ETF-jev kot neposrednega merjenja kapitalskih tokov.
+Ocene skenerja so hevristika, ne potrjen signal ali zagotovilo donosa.
+
+Podatki skenerja:
+{context}
+"""
+
+    payload = {
+        "contents": [
+            {"parts": [{"text": prompt}]}
+        ]
+    }
+
+    last_error = "Klic API-ja ni uspel."
+
+    for model_name in models_to_try:
+        try:
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model_name}:generateContent"
+            )
+            response = requests.post(
+                url,
+                params={"key": api_key},
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=40,
+            )
+
+            if response.status_code == 200:
+                candidates = response.json().get("candidates", [])
+                if candidates:
+                    parts = (
+                        candidates[0]
+                        .get("content", {})
+                        .get("parts", [])
+                    )
+                    text = "\n".join(
+                        part.get("text", "")
+                        for part in parts
+                        if part.get("text")
+                    )
+                    if text.strip():
+                        return model_name, text
+
+                last_error = f"{model_name}: API ni vrnil besedila."
+            else:
+                last_error = (
+                    f"{model_name}: HTTP {response.status_code} "
+                    f"{response.text[:300]}"
+                )
+
+        except requests.RequestException as error:
+            last_error = str(error)
+
+    raise RuntimeError(last_error)
+
+
+st.markdown("---")
+st.subheader("Avtonomni AI analitik trga")
+st.caption(
+    "Analiza uporabi trenutno izračunane skenske podatke. "
+    "Ne nadomešča preverjanja izvirnih finančnih izkazov."
+)
+
+gemini_key = st.text_input(
+    "Gemini API ključ",
+    type="password",
+    key="value_ledger_gemini_api_key",
+)
+
+if st.button("Zaženi AI analizo trga", key="run_value_ledger_ai_analysis"):
+    if not gemini_key.strip():
+        st.error("Vnesi Gemini API ključ.")
+    else:
+        try:
+            with st.spinner("Analiziram rezultate skenerja..."):
+                ai_context = build_ai_market_context()
+                used_model, ai_text = request_ai_market_analysis(
+                    gemini_key,
+                    ai_context,
+                )
+            st.session_state["value_ledger_ai_report"] = ai_text
+            st.session_state["value_ledger_ai_model"] = used_model
+        except Exception as error:
+            st.error(f"AI analiza ni uspela: {str(error)[:500]}")
+
+if st.session_state.get("value_ledger_ai_report"):
+    st.markdown(
+        f"**Model:** {html.escape(st.session_state.get('value_ledger_ai_model', 'Gemini'))}"
+    )
+    st.markdown(st.session_state["value_ledger_ai_report"])
