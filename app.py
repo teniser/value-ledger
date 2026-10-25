@@ -1680,3 +1680,8 @@ finally:
     progress.empty()
 
 if scan_errors:
+        st.caption(f"Podatki niso bili uspešno vrnjeni za {len(scan_errors)} tickerjev.")
+    if scan_errors:
+    st.caption(f"Podatki niso bili uspešno vrnjeni za {len(scan_errors)} tickerjev.")
+
+best_long = long_candidates[0] if long_candidates else None
