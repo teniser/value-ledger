@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import plotly.graph_objects as go
 import requests
 from datetime import datetime, time
 import pytz
@@ -135,7 +134,6 @@ def get_history_edge(ticker, price_f, fcf, mcap):
         fcf_y = 0.0
         if fcf and mcap and mcap > 0:
             fcf_y = float(fcf) / float(mcap) * 100
-            # KING GUARD: nemogoc yield = yfinance napaka, brez bonusa
             if fcf_y > 15.0 or fcf_y < -10.0:
                 fcf_y = max(-10.0, min(fcf_y, 15.0))
             else:
@@ -248,17 +246,13 @@ def get_asymmetry_score(ticker):
     try:
         info = yf.Ticker(ticker).info
         ps_raw = info.get("priceToSalesTrailing12Months")
-        # KING GUARD proti yfinance napaki kot TSM 0.44
         if ps_raw is None or float(ps_raw) < 1.0:
             return {"score": 0.0, "ps": 20.0, "peg": 99.0, "growth": 0.0, "price": 0.0, "net_cash": 0, "debt": 1, "ws_score": 0, "ws_rec": 0, "ws_upside": 0, "ws_num": 0, "vs_med": 0, "fcf_yield": 0, "bad_data": True}
         ps = float(ps_raw)
-        peg = info.get("pegRatio") or 2.0
-        peg = float(peg)
-        gr = info.get("revenueGrowth") or 0.15
-        gr = float(gr)
+        peg = float(info.get("pegRatio") or 2.0)
+        gr = float(info.get("revenueGrowth") or 0.15)
         if gr > 1.0:
             gr = gr / 100.0
-        # KING GUARD: 50.9% spike odrezi
         if gr > 0.40:
             gr = 0.25
         price = info.get("currentPrice") or info.get("regularMarketPrice") or 0.0
@@ -483,28 +477,32 @@ st.markdown('<div class="mndy-hero-card"><span style="font-size:1.35rem;font-wei
 c = data.get("CRWD", {"price": 325.0, "chg": 0.0, "ps": 17.0})
 st.markdown('<div class="ledger-card"><span style="font-size:1.25rem;font-weight:700;color:#FFFFFF;">CRWD</span> <span class="aplus-badge">A+ SETUP</span><div style="font-size:1.55rem;color:#fff;">$' + str(c["price"]) + '</div></div>', unsafe_allow_html=True)
 
-col1, col2 = st.columns([1, 1.25])
-with col1:
-    st.markdown("<h3>Primerjava 4 stebrov</h3>", unsafe_allow_html=True)
-    sel = st.multiselect("Izberite delnice:", options=tick_list, default=["MNDY", "CRWD", "NOW", "PLTR"])
-    cats = ["Sentiment", "Makro", "Temelji", "Podcenjenost"]
-    fig = go.Figure()
-    cols = {"MNDY": "#F59E0B", "CRWD": "#10B981", "SNOW": "#60A5FA", "NOW": "#8B5CF6", "PLTR": "#EF4444"}
-    for t in sel:
-        cfg = TICKERS_CONFIG[t]
-        vals = [cfg["sentiment"], cfg["makro"], cfg["temelji"], cfg["podcenjenost"]]
-        vals.append(vals[0])
-        fig.add_trace(go.Scatterpolar(r=vals, theta=cats+[cats[0]], name=t, line=dict(color=cols.get(t, "#fff"), width=2), fill="toself"))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), paper_bgcolor="rgba(0,0,0,0)", height=300, margin=dict(l=20, r=20, t=10, b=10))
-    st.plotly_chart(fig, use_container_width=True)
-with col2:
-    st.markdown("<h3>Primerjalna tabela</h3>", unsafe_allow_html=True)
-    rows = []
-    for t, cfg in TICKERS_CONFIG.items():
-        ld = data.get(t, {"price": 0.0, "ps": 0.0})
-        sc = round((cfg["sentiment"]*1.2+cfg["makro"]+cfg["temelji"]*1.1+cfg["podcenjenost"]*1.4)/4.7,1)
-        rows.append({"Ticker": t, "Cena": ld["price"], "P/S": ld["ps"], "Ocena": sc, "Status": cfg["category"]})
-    st.dataframe(pd.DataFrame(rows).sort_values(by="Ocena", ascending=False), use_container_width=True, hide_index=True)
+topL = scan_top_long(5)
+topR = scan_top_reversal(5)
+
+colL, colR = st.columns(2)
+with colL:
+    st.markdown("### King TOP5 Long - asimetrija")
+    rowsL = []
+    for x in topL:
+        s = x["signal"]
+        lv = get_atr_levels(x["ticker"], s["price"])
+        rowsL.append({"Ticker": x["ticker"], "Cena": s["price"], "Score": s["score"], "P/S": s["ps"], "PEG": s["peg"], "vs3y%": s.get("vs_med"), "FCFy%": s.get("fcf_yield"), "WS": s.get("ws_score"), "STOP": lv["stop"] if lv else None, "T1": lv["t1"] if lv else None})
+    if rowsL:
+        st.dataframe(pd.DataFrame(rowsL).sort_values(by="Score", ascending=False), use_container_width=True, hide_index=True)
+    else:
+        st.info("NI STROGEGA KANDIDATA")
+
+with colR:
+    st.markdown("### King TOP5 Dip - tik pred obratom")
+    rowsR = []
+    for x in topR:
+        s = x["signal"]
+        rowsR.append({"Ticker": x["ticker"], "Score": s["score"], "open%": s.get("rel_open"), "vwap%": s.get("rel_vwap"), "volx": s.get("vol_ratio"), "RSI": s.get("rsi"), "mom%": s.get("momentum")})
+    if rowsR:
+        st.dataframe(pd.DataFrame(rowsR).sort_values(by="Score", ascending=False), use_container_width=True, hide_index=True)
+    else:
+        st.info("NI STROGEGA KANDIDATA - cakaj kot CRWD setup")
 
 col_rot, col_exit = st.columns(2)
 with col_rot:
@@ -520,7 +518,7 @@ if st.button("POZENI AVTONOMNI AI PREGLED TRGA"):
     else:
         with st.spinner("Povezovanje z Gemini AI..."):
             ctx = build_ai_context()
-            prompt_text = "Ti si analitik Value Ledger 2.0 KING.\n" + ctx + "\nCene10: " + str(data) + "\nPRAVILA: TSM in vsak ticker z bad_data ali FCFy>15% ali P/S fallback 20.0 IGNORIRAJ kot pokvarjen podatek, ne kot BEST. MNDY je historični hold zaradi 3y mediane -50% in SaaS strahu, net-cash, FCF 21.8%, PEG 0.62. DIP velja samo ce score>6.0 + RSI<35 + zelena sveca + VWAP reclaim + vol>1.3x + momentum>0 + ni earnings 5d, sicer NI STROGEGA KANDIDATA. ADBE 4.4/10 ni BEST. Izberi 1 BEST LONG + 1 BEST DIP + 1 AVOID. Za vsakega 3 razlogi s stevilkami P/S PEG WS RSI VWAP volumen earnings. Odgovori v slovenscini z ocenami 1-10."
+            prompt_text = "Ti si analitik Value Ledger 2.0 KING.\n" + ctx + "\nCene10: " + str(data) + "\nPRAVILA: TSM in vsak ticker z bad_data ali FCFy>15% ali P/S fallback 20.0 IGNORIRAJ kot pokvarjen podatek, ne kot BEST. MNDY je historicni hold zaradi 3y mediane -50% in SaaS strahu, net-cash, FCF 21.8%, PEG 0.62. DIP velja samo ce score>6.0 + RSI<35 + zelena sveca + VWAP reclaim + vol>1.3x + momentum>0 + ni earnings 5d, sicer NI STROGEGA KANDIDATA. ADBE 4.4/10 ni BEST. Izberi 1 BEST LONG + 1 BEST DIP + 1 AVOID. Za vsakega 3 razlogi s stevilkami P/S PEG WS RSI VWAP volumen earnings. Odgovori v slovenscini z ocenami 1-10."
             clean_key = api_key.strip()
             payload = {"contents": [{"parts": [{"text": prompt_text}]}]}
             success = False
