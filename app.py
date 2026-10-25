@@ -1714,4 +1714,4 @@ else:
     st.info(
         "NI STROGEGA KANDIDATA. Intraday oziroma premarket podatki "
         "trenutno ne izpolnjujejo vseh pogojev."
-    )z
+    )
