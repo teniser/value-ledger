@@ -191,6 +191,50 @@ def get_asymmetry_score(ticker):
     except Exception:
         return None
 
+def get_liquidity_ok(ticker):
+    try:
+        info = yf.Ticker(ticker).info
+        mcap = info.get("marketCap") or 0
+        avgv = info.get("averageVolume") or info.get("averageDailyVolume10Day") or 0
+        price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+        if mcap < 2000000000:
+            return False
+        if avgv and price and (float(avgv) * float(price) < 20000000):
+            return False
+        return True
+    except Exception:
+        return True
+
+def get_rsi_5m(df, period=14):
+    try:
+        c = df["Close"].astype(float)
+        d = c.diff()
+        up = d.clip(lower=0).rolling(period).mean()
+        down = (-d.clip(upper=0)).rolling(period).mean()
+        rs = up / down.replace(0, float("nan"))
+        rsi = 100 - (100 / (1 + rs))
+        return float(rsi.iloc[-1])
+    except Exception:
+        return 50.0
+
+def has_earnings_soon(ticker, days=5):
+    try:
+        td = yf.Ticker(ticker)
+        ed = None
+        try:
+            ed = td.get_earnings_dates(limit=2)
+        except Exception:
+            ed = None
+        if ed is None or (isinstance(ed, pd.DataFrame) and ed.empty):
+            return False
+        idx = ed.index[0]
+        earn_date = pd.to_datetime(idx).tz_localize(None)
+        now = datetime.now()
+        delta = (earn_date - now).days
+        return 0 <= delta <= days
+    except Exception:
+        return False
+
 @st.cache_data(ttl=1800)
 def scan_best_long():
     best = None
@@ -202,6 +246,8 @@ def scan_best_long():
             continue
         if r["debt"] > 0 and r["net_cash"] < 0:
             continue
+        if not get_liquidity_ok(t):
+            continue
         if r["score"] < 6.5:
             continue
         if best is None or r["score"] > best["signal"]["score"]:
@@ -212,7 +258,8 @@ def scan_best_long():
 def scan_best_reversal():
     best = None
     for t in AI_UNIVERSE:
-        sig = tactical_intraday_signal(get_intraday_df(t))
+        df = get_intraday_df(t)
+        sig = tactical_intraday_signal(df)
         if sig is None:
             continue
         sig["score"] = king_adjusted_score(sig["score"], t)
@@ -225,6 +272,10 @@ def scan_best_reversal():
         if sig.get("vol_ratio", 0) < 1.3:
             continue
         if sig.get("momentum", 0) < 0:
+            continue
+        if get_rsi_5m(df) > 35:
+            continue
+        if has_earnings_soon(t, 5):
             continue
         if sig["score"] < 6.0:
             continue
@@ -270,15 +321,13 @@ if regime_txt == "RISK-OFF":
 bestL = scan_best_long()
 bestR = scan_best_reversal()
 if bestL is not None:
-    l_txt = str(bestL["ticker"]) + " " + str(bestL["signal"]["score"]) + "/10 P/S " + str(bestL["signal"]["ps"]) + " PEG " + str(bestL["signal"]["peg"]) + " WS " + str(bestL["signal"]["ws_score"]) + "/10"
+    l_txt = str(bestL["ticker"]) + " " + str(bestL["signal"]["score"]) + "/10 P/S " + str(bestL["signal"]["ps"]) + " PEG " + str(bestL["signal"]["peg"])
 else:
     l_txt = "NI STROGEGA KANDIDATA"
 if bestR is not None:
-    r_txt = str(bestR["ticker"]) + " " + str(bestR["signal"]["score"]) + "/10 $" + str(bestR["signal"]["last"]) + " open " + str(bestR["signal"]["rel_open"]) + "%"
+    r_txt = str(bestR["ticker"]) + " " + str(bestR["signal"]["score"]) + "/10"
 else:
-    r_txt = "NI STROGEGA KANDIDATA - ni dipa pred obratom"
-auto_banner = '<div class="preclose-banner"><div style="font-weight:700;color:#FEE2E2;">BEST LONG: ' + l_txt + '</div><div style="font-weight:700;color:#FEE2E2;margin-top:6px;">BEST OBRAT DIP: ' + r_txt + '</div><div style="color:#FCA5A5;font-size:0.82rem;margin-top:6px;">Trg: ' + str(regime_txt) + ' WS + makro v LONG | dip filter v OBRAT | auto ob refreshu</div></div>'
-st.markdown(auto_banner, unsafe_allow_html=True)
+    r_txt = "NI STROGEGA KANDIDATA"
 
 evening = get_evening_decision(held_ticker)
 if is_preclose_window() and evening["held"] is not None:
@@ -323,6 +372,13 @@ with col2:
         rows.append({"Ticker": t, "Cena": ld["price"], "P/S": ld["ps"], "Ocena": sc, "Status": cfg["category"]})
     st.dataframe(pd.DataFrame(rows).sort_values(by="Ocena", ascending=False), use_container_width=True, hide_index=True)
 
+col_rot, col_exit = st.columns(2)
+with col_rot:
+    rot_html = '<div class="ledger-card"><h4 style="color:#10B981;">Capital Rotation Radar</h4><p style="font-size:0.82rem;color:#94A3B8;">Trg: ' + str(regime_txt) + '</p><div style="font-size:0.82rem;color:#6EE7B7;">BEST LONG: ' + l_txt + '<br>BEST OBRAT: ' + r_txt + '</div></div>'
+    st.markdown(rot_html, unsafe_allow_html=True)
+with col_exit:
+    st.markdown('<div class="ledger-card"><h4 style="color:#F59E0B;">MNDY Stopnje</h4><div style="font-size:0.82rem;color:#CBD5E1;">1. Tarca 220-240: prodaj 20-25%.<br>2. Tarca 280-310: prodaj 50%.<br>3. Tarca nad 340: popolna prodaja.</div></div>', unsafe_allow_html=True)
+
 st.markdown("---")
 st.markdown("<h3>Avtonomni AI Analitik</h3>", unsafe_allow_html=True)
 if st.button("POZENI AVTONOMNI AI PREGLED TRGA"):
@@ -330,7 +386,7 @@ if st.button("POZENI AVTONOMNI AI PREGLED TRGA"):
         st.error("Vnesite Gemini API kljuc.")
     else:
         with st.spinner("Povezovanje z Gemini AI..."):
-            prompt_text = "Ti si analitik Value Ledger 2.0. Cene: " + str(data) + " Trg: " + str(regime_txt) + " BEST LONG: " + l_txt + " BEST OBRAT DIP: " + r_txt + ". Pripravi porocilo v slovenscini z ocenami 1-10."
+            prompt_text = "Ti si analitik Value Ledger 2.0. Cene: " + str(data) + " Trg: " + str(regime_txt) + " BEST LONG: " + l_txt + " BEST OBRAT: " + r_txt + ". Pripravi porocilo v slovenscini z ocenami 1-10."
             clean_key = api_key.strip()
             payload = {"contents": [{"parts": [{"text": prompt_text}]}]}
             success = False
