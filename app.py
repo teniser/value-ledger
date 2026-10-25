@@ -1712,4 +1712,6 @@ if reversal_candidates:
     render_table(pd.DataFrame(reversal_candidates))
 else:
     st.info(
-        "NI STROGEGA KANDIDATA.
+        "NI STROGEGA KANDIDATA. Intraday oziroma premarket podatki "
+        "trenutno ne izpolnjujejo vseh pogojev."
+    )z
