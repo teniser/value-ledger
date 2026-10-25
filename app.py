@@ -2268,3 +2268,50 @@ else:
         "Aplikacija deluje, vendar za avtomatsko osveževanje posodobi Streamlit."
     )
     render_dashboard()
+    @st.cache_data(ttl=900, show_spinner=False)
+def sector_relative_returns(ticker, sector):
+    etf = SECTOR_ETF.get(sector)
+    if not etf:
+        return None, None
+
+    try:
+        stock = yf.Ticker(ticker).history(
+            period="6mo",
+            interval="1d",
+            auto_adjust=True,
+        )
+        benchmark = yf.Ticker(etf).history(
+            period="6mo",
+            interval="1d",
+            auto_adjust=True,
+        )
+
+        if stock is None or stock.empty or benchmark is None or benchmark.empty:
+            return None, None
+
+        joined = pd.concat(
+            [
+                stock["Close"].rename("stock"),
+                benchmark["Close"].rename("sector"),
+            ],
+            axis=1,
+            join="inner",
+        ).dropna()
+
+        if len(joined) < 61:
+            return None, None
+
+        rel20 = (
+            (joined["stock"].iloc[-1] / joined["stock"].iloc[-21] - 1)
+            - (joined["sector"].iloc[-1] / joined["sector"].iloc[-21] - 1)
+        ) * 100
+
+        rel60 = (
+            (joined["stock"].iloc[-1] / joined["stock"].iloc[-61] - 1)
+            - (joined["sector"].iloc[-1] / joined["sector"].iloc[-61] - 1)
+        ) * 100
+
+        return round(float(rel20), 2), round(float(rel60), 2)
+
+    except Exception:
+        return None, None
