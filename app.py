@@ -1,9 +1,3 @@
-Prejšnje različice so imele napake v izpisu kode in zamikih. Spodaj je celoten `app.py` na novo sestavljen; funkcije so definirane pred uporabo, HTML kartice ne uporabljajo več večvrstičnih f-stringov, Capital Rotation Radar in AI analitik pa ostajata vključena. Kode v tvojem Streamlit okolju ne morem zagnati, zato ne morem potrditi povezave do Yahoo Finance ali Gemini API-ja. Pred zamenjavo shrani kopijo obstoječega `app.py`.
-
-
-app.py
-
-```python
 import html
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
