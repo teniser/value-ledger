@@ -1273,3 +1273,134 @@ def build_reversal_signal(ticker, history, session_date, now_ny=None):
     prior_close = safe_float(bars["Close"].iloc[-2])
     prior_vwap = safe_float(vwap.iloc[-2])
     current_vwap = safe_float(vwap.iloc[-1])
+                                entry = safe_float(bars["Open"].iloc[index + 1])
+                            exit_index = min(index + 13, len(bars) - 1)
+                            exit_price = safe_float(bars["Close"].iloc[exit_index])
+
+                            if entry is None or exit_price is None or entry <= 0:
+                                continue
+
+                            trades.append({
+                                "Datum": str(session_date),
+                                "Ticker": ticker,
+                                "Seja": (
+                                    "Premarket"
+                                    if session_kind == "premarket"
+                                    else "Redna"
+                                ),
+                                "Vstop": round(entry, 2),
+                                "Izhod": round(exit_price, 2),
+                                "Donos %": round(
+                                    (exit_price / entry - 1) * 100,
+                                    2,
+                                ),
+                            })
+
+                            # Največ en signal na ticker na dan in sejo.
+                            break
+
+        backtest_frame = pd.DataFrame(trades)
+
+        if backtest_frame.empty:
+            st.info(
+                "V pridobljenih podatkih ni bilo najdenega setupa po teh pravilih."
+            )
+        else:
+            win_rate = (
+                (backtest_frame["Donos %"] > 0).mean() * 100
+            )
+            average_return = backtest_frame["Donos %"].mean()
+            median_return = backtest_frame["Donos %"].median()
+
+            metric1, metric2, metric3, metric4 = st.columns(4)
+            metric1.metric("Posli", len(backtest_frame))
+            metric2.metric("Pozitivni posli", f"{win_rate:.1f}%")
+            metric3.metric("Povprečni donos", f"{average_return:.2f}%")
+            metric4.metric("Mediani donos", f"{median_return:.2f}%")
+
+            render_dark_table(backtest_frame)
+
+            st.warning(
+                "To je omejen diagnostični izračun. Ne vključuje zgodovinskih "
+                "earnings informacij, stroškov, zdrsa ali realističnega "
+                "modela izvršitve."
+            )
+
+
+# ============================================================
+# GEMINI ANALITIK
+# ============================================================
+
+st.subheader("Avtonomni AI Analitik")
+st.caption(
+    "AI komentira dejanske podatke, prikazane v skenu. Ne sme si izmišljati "
+    "manjkajočih meritev ali obljubljati donosa."
+)
+
+if st.button("Zaženi AI komentar trga"):
+    if not gemini_api_key:
+        st.error("Vnesi Gemini API ključ.")
+    else:
+        long_context = [
+            {
+                "ticker": item["ticker"],
+                "sector": item["sector"],
+                "composite_score": item.get("composite_score"),
+                "fcf_quality": item.get("fcf_quality"),
+                "valuation_score": item.get("valuation_score"),
+                "sector_percentile": item.get("sector_percentile"),
+                "data_reliability": item.get("data_reliability"),
+                "price": item.get("price"),
+                "ps": item.get("ps"),
+                "peg": item.get("peg"),
+                "revenue_growth": item.get("revenue_growth"),
+                "fcf_yield": item.get("fcf_yield"),
+            }
+            for item in long_candidates[:5]
+        ]
+
+        prompt = f"""
+Odgovori v slovenščini kot previden analitik podatkov.
+
+Uporabi samo spodaj navedene podatke. Ne izmišljaj si cen, novic,
+earnings datumov, tokov kapitala ali prihodnjih donosov.
+Relativna moč ETF-jev je cenovni približek in ni neposredno merjenje
+tokov denarja.
+Fundamentalne ocene so hevristične, ne potrjena primerjava poštene
+vrednosti ali napoved donosa.
+Če kandidatov ni, napiši "NI STROGEGA KANDIDATA".
+Ne obljubljaj dobička in nobenega kandidata ne označi kot zagotovljenega
+zmagovalca.
+
+Tržni režim: {market}
+Sektorska relativna moč: {rotation}
+Fundamentalni kandidati: {long_context}
+Intraday reversal kandidati: {reversal_candidates}
+
+Odgovori v treh kratkih delih:
+1. Tržni režim in relativna moč sektorjev.
+2. Kaj kažejo ločene fundamentalne ocene in kakšne so njihove omejitve.
+3. Ali je reversal kandidat prestal prikazane filtre; uporabi samo navedene
+   številke.
+Če pomemben podatek manjka, to jasno povej.
+"""
+
+        try:
+            with st.spinner("Pripravljam komentar prikazanih podatkov..."):
+                model_name, report = get_gemini_comment(
+                    gemini_api_key,
+                    prompt,
+                )
+
+            st.caption(f"API model: {model_name}")
+            st.markdown(report)
+
+        except Exception as error:
+            st.error(f"AI komentar ni uspel: {error}")
+
+
+st.caption(
+    "Podatki se osvežijo ob ponovnem nalaganju strani ali s klikom na "
+    "Osveži skene. Aplikacija ne spremlja trga v ozadju in ne pošilja "
+    "samodejnih opozoril."
+)
