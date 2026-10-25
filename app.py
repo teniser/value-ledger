@@ -11,7 +11,7 @@ import yfinance as yf
 
 
 # ============================================================
-# PAGE CONFIG + DARK TERMINAL THEME
+# NASTAVITVE IN TEMNI VIDEZ
 # ============================================================
 
 st.set_page_config(
@@ -49,19 +49,19 @@ st.markdown(
         padding: 20px 24px;
         margin: 8px 0 18px 0;
     }
-    .hero-mndy {
+    .hero-long {
         background: linear-gradient(145deg, rgba(48,34,10,0.72), rgba(13,17,28,0.96));
-        border: 1px solid rgba(245,158,11,0.55);
+        border: 1px solid rgba(245,158,11,0.58);
         border-radius: 18px;
         padding: 20px 24px;
-        min-height: 125px;
+        min-height: 190px;
     }
-    .hero-crwd {
+    .hero-reversal {
         background: linear-gradient(145deg, rgba(9,43,39,0.75), rgba(13,17,28,0.96));
-        border: 1px solid rgba(16,185,129,0.42);
+        border: 1px solid rgba(16,185,129,0.48);
         border-radius: 18px;
         padding: 20px 24px;
-        min-height: 125px;
+        min-height: 190px;
     }
     div.stButton > button {
         background: linear-gradient(135deg,#F59E0B 0%,#D97706 100%) !important;
@@ -81,11 +81,11 @@ LJ_TZ = ZoneInfo("Europe/Ljubljana")
 
 
 # ============================================================
-# UNIVERSE: DEDUPLICATED AND LIMITED TO 150 TICKERS
+# UNIVERZUM: UNIKATNI TICKERJI, NAJVEČ 150
 # ============================================================
 
 TICKER_CANDIDATES = [
-    # SaaS, software and cloud
+    # SaaS, programska oprema in cloud
     "MNDY", "CRWD", "SNOW", "HUBS", "DDOG", "TEAM", "NOW", "PANW",
     "PLTR", "CRM", "ADBE", "SHOP", "NET", "ZS", "OKTA", "MDB",
     "ESTC", "PATH", "WDAY", "CFLT", "DOCN", "GTLB", "TOST", "BILL",
@@ -93,32 +93,32 @@ TICKER_CANDIDATES = [
     "DOCU", "TWLO", "PD", "DBX", "SMAR", "UPWK", "SPT", "APPN",
     "PEGA", "FROG", "RNG", "VEEV", "TYL", "PTC", "ADSK", "TRMB",
 
-    # Large technology and internet
+    # Velika tehnologija in internet
     "AAPL", "MSFT", "META", "AMZN", "GOOGL", "NFLX", "TSLA",
     "UBER", "ABNB", "DASH", "SPOT", "RBLX", "TTD", "ROKU",
     "PINS", "SNAP", "MTCH", "DKNG", "LYFT", "EBAY",
 
-    # Semiconductors, equipment and hardware
+    # Polprevodniki, oprema in strojna oprema
     "NVDA", "AVGO", "AMD", "TSM", "MU", "QCOM", "ARM", "SMCI",
     "ANET", "MRVL", "SNPS", "CDNS", "ANSS", "ALAB", "LITE",
     "COHR", "VRT", "NTNX", "PSTG", "STX", "WDC", "TXN", "ADI",
     "NXPI", "MCHP", "ON", "INTC", "ASML", "AMAT", "LRCX",
     "KLAC", "DELL", "CSCO", "HPE", "HPQ", "GLW", "TER", "KEYS",
 
-    # Cybersecurity
+    # Kibernetska varnost
     "CHKP", "CYBR", "TENB", "VRNS", "QLYS", "FTNT", "AKAM",
     "VRSN", "GEN", "S",
 
-    # Finance, payments and fintech
+    # Finance, plačila in fintech
     "COIN", "HOOD", "XYZ", "PYPL", "SOFI", "AFRM", "MELI",
     "SE", "NU", "V", "MA", "GLBE", "JPM", "GS", "MS", "C",
     "BAC", "SCHW", "ICE", "CME",
 
-    # Healthcare and medical technology
+    # Zdravstvo in medicinska tehnologija
     "ISRG", "DXCM", "PODD", "EXAS", "ILMN", "ALGN", "MDT",
     "SYK", "BSX", "ABT", "VRTX", "REGN", "LLY", "NVO", "UNH",
 
-    # Industrials, energy, consumer and other sectors
+    # Industrija, energija, potrošnja in drugi sektorji
     "CAT", "DE", "ETN", "GE", "HON", "PH", "RTX", "LMT",
     "XOM", "CVX", "SLB", "FSLR", "ENPH", "NXT", "COST",
     "WMT", "HD", "LOW", "MCD", "NKE", "KO", "PG", "F",
@@ -142,7 +142,7 @@ TICKERS_CONFIG = {
 
 
 # ============================================================
-# HELPERS
+# SPLOŠNE POMOŽNE FUNKCIJE
 # ============================================================
 
 def safe_float(value):
@@ -163,7 +163,7 @@ def display_value(value, digits=2, suffix=""):
 
 
 def render_dark_table(frame):
-    """Prikaže tabelo v temnem slogu brez f-string CSS napake."""
+    """Prikaže tabelo v temnem slogu."""
     if frame is None or frame.empty:
         st.info("Ni podatkov za prikaz.")
         return
@@ -184,7 +184,7 @@ def render_dark_table(frame):
             cells.append(f"<td>{html.escape(text)}</td>")
         body_rows.append("<tr>" + "".join(cells) + "</tr>")
 
-    # Navaden niz, ne f-string: CSS zaviti oklepaji se ne obdelujejo kot Python.
+    # Navaden niz, ne f-string: zaviti CSS-oklepaji ne sprožijo Pythonove napake.
     table_html = (
         '<div style="overflow-x:auto;border:1px solid #263044;'
         'border-radius:10px;margin:8px 0 18px 0;">'
@@ -205,7 +205,6 @@ def render_dark_table(frame):
         "table tbody tr:nth-child(even) {background:#101522;}"
         "</style>"
     )
-
     st.markdown(table_html, unsafe_allow_html=True)
 
 
@@ -217,12 +216,11 @@ def log_event(kind, ticker, score, detail=""):
                 f"{datetime.now().isoformat()},{kind},{ticker},{score},{safe_detail}\n"
             )
     except Exception:
-        # Napaka pri beleženju ne sme ustaviti aplikacije.
         pass
 
 
 # ============================================================
-# MARKET REGIME AND SECTOR RELATIVE STRENGTH
+# TRŽNI REŽIM IN SEKTORSKA RELATIVNA MOČ
 # ============================================================
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -262,7 +260,7 @@ def get_market_regime():
 
 @st.cache_data(ttl=900, show_spinner=False)
 def get_capital_rotation():
-    # ETF-ji kažejo relativno gibanje cen, ne neposrednih tokov kapitala.
+    # ETF-ji merijo relativno gibanje cen, ne neposrednih denarnih tokov.
     sector_etfs = {
         "SaaS / software (IGV)": "IGV",
         "Semiconductors (SMH)": "SMH",
@@ -390,9 +388,8 @@ def get_capital_rotation():
                 pair = "NI JASNE RELATIVNE ROTACIJE"
 
             detail = (
-                f"IGV/SMH razmerje: 20d {p20:+.1f}%, "
-                f"60d {p60:+.1f}%; nad SMA20: "
-                f"{'DA' if above_sma20 else 'NE'}"
+                f"IGV/SMH: 20d {p20:+.1f}%, 60d {p60:+.1f}%; "
+                f"nad SMA20: {'DA' if above_sma20 else 'NE'}"
             )
 
     return {
@@ -407,7 +404,7 @@ rotation = get_capital_rotation()
 
 
 # ============================================================
-# FUNDAMENTAL DATA: TRANSPARENT HEURISTIC
+# FUNDAMENTI IN DINAMIČNI TOP LONG
 # ============================================================
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -421,7 +418,7 @@ def get_fundamental_data(ticker):
         price = get_num("currentPrice") or get_num("regularMarketPrice")
         market_cap = get_num("marketCap")
         average_volume = get_num("averageVolume")
-        ps = get_num("priceToSalesTrailing12Months")
+        ps_raw = get_num("priceToSalesTrailing12Months")
         peg = get_num("pegRatio")
         revenue_growth = get_num("revenueGrowth")
         cash = get_num("totalCash")
@@ -429,17 +426,18 @@ def get_fundamental_data(ticker):
         fcf = get_num("freeCashflow")
         revenue = get_num("totalRevenue")
         analyst_count = get_num("numberOfAnalystOpinions")
+        recommendation_mean = get_num("recommendationMean")
         analyst_target = (
             get_num("targetMeanPrice")
             or get_num("targetMedianPrice")
         )
 
         if revenue_growth is not None and revenue_growth > 1:
-            revenue_growth = revenue_growth / 100
+            revenue_growth /= 100
 
         fcf_margin = None
         if fcf is not None and revenue not in (None, 0):
-            fcf_margin = (fcf / revenue) * 100
+            fcf_margin = fcf / revenue * 100
 
         dollar_volume = None
         if price is not None and average_volume is not None:
@@ -453,125 +451,47 @@ def get_fundamental_data(ticker):
         if cash is not None and debt is not None:
             net_cash = cash - debt
 
+        fcf_yield_raw = None
+        if fcf is not None and market_cap not in (None, 0):
+            fcf_yield_raw = fcf / market_cap * 100
+
+        # Ekstremne vrednosti obravnavamo kot sumljive podatke in jih ne točkujemo.
+        fcf_yield = fcf_yield_raw
+        fcf_yield_valid = (
+            fcf_yield_raw is not None
+            and -10 <= fcf_yield_raw <= 15
+        )
+        if not fcf_yield_valid:
+            fcf_yield = None
+
         return {
             "ticker": ticker,
             "name": info.get("shortName") or ticker,
             "price": price,
             "market_cap": market_cap,
             "dollar_volume": dollar_volume,
-            "ps": ps,
+            "ps": ps_raw,
+            "ps_valid": ps_raw is not None and ps_raw >= 1,
             "peg": peg,
             "revenue_growth": revenue_growth,
+            "fcf": fcf,
             "fcf_margin": fcf_margin,
+            "fcf_yield": fcf_yield,
+            "fcf_yield_raw": fcf_yield_raw,
+            "fcf_yield_valid": fcf_yield_valid,
             "net_cash": net_cash,
+            "debt": debt,
             "analyst_count": analyst_count,
+            "recommendation_mean": recommendation_mean,
             "analyst_upside": analyst_upside,
         }
     except Exception:
         return None
 
 
-def passes_liquidity(data):
-    # Manjkajoči podatki niso dokaz, da je delnica dovolj likvidna.
-    return bool(
-        data
-        and data.get("market_cap") is not None
-        and data.get("dollar_volume") is not None
-        and data["market_cap"] >= 2_000_000_000
-        and data["dollar_volume"] >= 20_000_000
-    )
-
-
-def heuristic_fundamental_score(data):
-    """
-    Pregledna, nebacktestirana hevristika.
-    Manjkajoče metrike niso nadomeščene z izmišljenimi privzetimi vrednostmi.
-    """
-    if not data:
-        return None, 0
-
-    score = 5.0
-    observed = 0
-    possible = 5
-
-    ps = data.get("ps")
-    if ps is not None and ps > 0:
-        observed += 1
-        if ps < 4:
-            score += 1.2
-        elif ps < 8:
-            score += 0.7
-        elif ps > 25:
-            score -= 0.8
-
-    growth = data.get("revenue_growth")
-    if growth is not None:
-        observed += 1
-        if growth > 0.25:
-            score += 1.0
-        elif growth > 0.10:
-            score += 0.5
-        elif growth < 0:
-            score -= 0.8
-
-    fcf_margin = data.get("fcf_margin")
-    if fcf_margin is not None:
-        observed += 1
-        if fcf_margin > 15:
-            score += 0.7
-        elif fcf_margin < 0:
-            score -= 0.7
-
-    net_cash = data.get("net_cash")
-    if net_cash is not None:
-        observed += 1
-        score += 0.5 if net_cash > 0 else -0.5
-
-    analyst_upside = data.get("analyst_upside")
-    if analyst_upside is not None:
-        observed += 1
-        if analyst_upside > 20:
-            score += 0.4
-        elif analyst_upside < -10:
-            score -= 0.4
-
-    score -= market["penalty"]
-    score = round(max(0.0, min(10.0, score)), 1)
-    coverage = round(observed / possible * 100)
-
-    return score, coverage
-
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def scan_fundamental_universe(universe):
-    rows = []
-
-    for ticker in universe:
-        data = get_fundamental_data(ticker)
-        if not data or not passes_liquidity(data):
-            continue
-
-        score, coverage = heuristic_fundamental_score(data)
-        rows.append({
-            **data,
-            "heuristic_score": score,
-            "data_coverage": coverage,
-        })
-
-    rows.sort(
-        key=lambda row: (
-            row["heuristic_score"],
-            row["data_coverage"],
-            row["ticker"],
-        ),
-        reverse=True,
-    )
-    return rows
-
-
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_three_year_price_context(ticker):
-    # Zgodovinska cena ni isto kot zgodovinski P/S ali dokaz podcenjenosti.
+    # Mediana cene ni zgodovinski P/S in sama ne dokazuje podcenjenosti.
     try:
         hist = yf.Ticker(ticker).history(
             period="3y",
@@ -595,8 +515,192 @@ def get_three_year_price_context(ticker):
         return None
 
 
+def passes_liquidity(data):
+    return bool(
+        data
+        and data.get("market_cap") is not None
+        and data.get("dollar_volume") is not None
+        and data["market_cap"] >= 2_000_000_000
+        and data["dollar_volume"] >= 20_000_000
+    )
+
+
+def wall_street_score(data):
+    """
+    Groba ocena Yahoo Finance analitikov in ciljne cene.
+    Ne meri spremembe sentimenta skozi čas.
+    """
+    score = 5.0
+    recommendation = data.get("recommendation_mean")
+
+    if recommendation is not None:
+        if recommendation <= 1.5:
+            score += 2.0
+        elif recommendation <= 2.0:
+            score += 1.5
+        elif recommendation <= 2.5:
+            score += 0.5
+        elif recommendation >= 4.0:
+            score -= 1.5
+        elif recommendation >= 3.5:
+            score -= 1.0
+
+    upside = data.get("analyst_upside")
+    if upside is not None:
+        if upside > 30:
+            score += 1.5
+        elif upside > 15:
+            score += 1.0
+        elif upside > 5:
+            score += 0.5
+        elif upside < -10:
+            score -= 1.0
+
+    analyst_count = data.get("analyst_count")
+    if analyst_count is not None and analyst_count < 5:
+        score -= 0.5
+
+    return max(0.0, min(10.0, score))
+
+
+def asymmetric_long_score(data):
+    """
+    Hevristična točkovna ocena. Ni potrjen model pričakovanega donosa.
+    """
+    if not data:
+        return None, 0
+
+    score = 5.0
+    observed = 0
+    possible = 7
+
+    ps = data.get("ps")
+    if ps is not None and ps >= 1:
+        observed += 1
+        if ps < 4:
+            score += 2.0
+        elif ps < 7:
+            score += 1.5
+        elif ps < 12:
+            score += 0.75
+        elif ps > 20:
+            score -= 1.0
+
+    peg = data.get("peg")
+    if peg is not None and peg > 0:
+        observed += 1
+        if peg < 0.9:
+            score += 1.5
+        elif peg < 1.3:
+            score += 1.0
+        elif peg < 2.0:
+            score += 0.4
+        elif peg > 2.8:
+            score -= 1.0
+
+    growth = data.get("revenue_growth")
+    if growth is not None:
+        observed += 1
+        if growth > 0.25:
+            score += 1.0
+        elif growth > 0.15:
+            score += 0.6
+        elif growth < 0.12:
+            score -= 0.5
+
+    fcf_margin = data.get("fcf_margin")
+    if fcf_margin is not None:
+        observed += 1
+        if fcf_margin > 20:
+            score += 1.0
+        elif fcf_margin > 10:
+            score += 0.5
+        elif fcf_margin < 0:
+            score -= 1.0
+
+    if data.get("net_cash") is not None:
+        observed += 1
+        if data["net_cash"] > 0:
+            score += 0.75
+        else:
+            score -= 0.75
+
+    if data.get("fcf_yield_valid"):
+        observed += 1
+        if data["fcf_yield"] > 5:
+            score += 0.75
+        elif data["fcf_yield"] > 3:
+            score += 0.4
+        elif data["fcf_yield"] < 0:
+            score -= 0.5
+
+    if (
+        data.get("analyst_upside") is not None
+        or data.get("recommendation_mean") is not None
+    ):
+        observed += 1
+        score += (wall_street_score(data) - 5.0) * 0.25
+
+    score -= market["penalty"]
+    score = round(max(0.0, min(10.0, score)), 1)
+    coverage = round(observed / possible * 100)
+
+    return score, coverage
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def scan_top_long(universe, n=5):
+    rows = []
+
+    for ticker in universe:
+        data = get_fundamental_data(ticker)
+        if not data or not passes_liquidity(data):
+            continue
+
+        # Izločimo neveljaven P/S, vključno z znanimi pod-1 napakami.
+        if not data.get("ps_valid"):
+            continue
+
+        # Zahtevani podatki za ta fundamentalni filter.
+        if data.get("peg") is None or data["peg"] <= 0 or data["peg"] > 2.8:
+            continue
+
+        growth = data.get("revenue_growth")
+        if growth is None or growth < 0.12:
+            continue
+
+        if (
+            data.get("debt") is not None
+            and data.get("net_cash") is not None
+            and data["debt"] > 0
+            and data["net_cash"] < 0
+        ):
+            continue
+
+        score, coverage = asymmetric_long_score(data)
+        if score is None:
+            continue
+
+        row = {
+            **data,
+            "score": score,
+            "coverage": coverage,
+        }
+        rows.append(row)
+
+    rows.sort(
+        key=lambda row: (
+            row["score"],
+            row["coverage"],
+            row["ticker"],
+        ),
+        reverse=True,
+    )
+    return rows[:n]
+
+
 # ============================================================
-# INTRADAY DATA: SEPARATE PREMARKET AND REGULAR SESSION
+# INTRADAY: PREMARKET IN REDNA SEJA LOČENO
 # ============================================================
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -623,7 +727,7 @@ def get_intraday_history(ticker, period="5d"):
             hist.index = hist.index.tz_localize("UTC")
         hist.index = hist.index.tz_convert(NY_TZ)
 
-        # Obdrži premarket in redno sejo; after-hours izloči.
+        # Premarket od 04:00 ET in redna seja do 16:00 ET. After-hours izločimo.
         keep = [
             time(4, 0) <= stamp.time() < time(16, 0)
             for stamp in hist.index
@@ -667,7 +771,6 @@ def get_previous_regular_close(history, session_date):
         reverse=True,
     )
 
-    # Poišči zadnji predhodni datum, za katerega obstaja redna seja.
     for previous_date in earlier_dates:
         previous_session = get_session_bars(
             history,
@@ -693,7 +796,6 @@ def anchored_vwap_series(bars):
     close = bars["Close"].astype(float)
     volume = bars["Volume"].astype(float).clip(lower=0)
 
-    # HLC3 VWAP, ponastavljen na začetku premarketa ali redne seje.
     typical_price = (high + low + close) / 3
     cumulative_volume = volume.cumsum().replace(0, float("nan"))
 
@@ -702,9 +804,8 @@ def anchored_vwap_series(bars):
 
 def same_time_volume_ratio(history, timestamp, session_bars, index_in_session):
     """
-    Primerja tekočo svečo z mediano prometa ob isti uri v preteklih sejah.
-    Premarket se primerja s premarketom, redna seja z redno sejo.
-    Brez primerljivih podatkov vrne None.
+    Primerjava z mediano prometa ob isti uri v zadnjih petih primerljivih sejah.
+    Premarket se ne primerja z redno sejo.
     """
     current_volume = safe_float(
         session_bars["Volume"].iloc[index_in_session]
@@ -718,6 +819,7 @@ def same_time_volume_ratio(history, timestamp, session_bars, index_in_session):
         else "regular"
     )
     clock = timestamp.strftime("%H:%M")
+
     earlier_dates = sorted({
         stamp.date()
         for stamp in history.index
@@ -779,8 +881,8 @@ def calculate_rsi(values, period=14):
 
 def earnings_within_days(ticker, days=5):
     """
-    True: najden datum v obdobju.
-    False: preverjeni podatki ne kažejo datuma v obdobju.
+    True: datum je najden v obdobju.
+    False: podatki so bili pridobljeni in datuma ni v obdobju.
     None: preverjanje ni uspelo ali datum ni na voljo.
     """
     try:
@@ -818,7 +920,7 @@ def build_reversal_signal(ticker, history, session_date, now_ny=None):
     if current_day.empty:
         return None
 
-    # Uporablja samo sveče, ki so se že zaključile.
+    # Uporabi samo zaključene 5-minutne sveče.
     completed_day = current_day[
         [
             stamp + timedelta(minutes=5) <= now_ny
@@ -828,10 +930,10 @@ def build_reversal_signal(ticker, history, session_date, now_ny=None):
     if completed_day.empty:
         return None
 
-    last_timestamp = completed_day.index[-1]
+    latest_timestamp = completed_day.index[-1]
     session_kind = (
         "premarket"
-        if last_timestamp.time() < time(9, 30)
+        if latest_timestamp.time() < time(9, 30)
         else "regular"
     )
 
@@ -874,7 +976,7 @@ def build_reversal_signal(ticker, history, session_date, now_ny=None):
     if prior_close is None or prior_vwap is None or current_vwap is None:
         return None
 
-    # Dejanski preboj navzgor: prejšnja sveča pod VWAP, zadnja nad VWAP.
+    # Dejanski prehod: prejšnji close je pod VWAP, zadnji pa nad njim.
     crossed_up = prior_close <= prior_vwap and close > current_vwap
     green_candle = close > open_price
 
@@ -899,7 +1001,7 @@ def build_reversal_signal(ticker, history, session_date, now_ny=None):
         return None
 
     earnings_status = earnings_within_days(ticker, 5)
-    # Ne razglasi signala za ustreznega, kadar earnings niso preverljivi.
+    # Kandidata ne označimo kot ustreznega, če earnings niso preverljivi.
     if earnings_status is not False:
         return None
 
@@ -924,7 +1026,7 @@ def build_reversal_signal(ticker, history, session_date, now_ny=None):
         ),
         "Cena": round(close, 2),
         "Gap proti prejšnjemu close %": round(gap_pct, 2),
-        "Sejni VWAP": round(current_vwap, 2),
+        "VWAP": round(current_vwap, 2),
         "Odstopanje od VWAP %": round(vwap_distance, 2),
         "Volumen proti isti uri x": round(volume_ratio, 2),
         "RSI 5m": round(rsi, 1),
@@ -934,7 +1036,7 @@ def build_reversal_signal(ticker, history, session_date, now_ny=None):
 
 
 @st.cache_data(ttl=90, show_spinner=False)
-def scan_reversals(universe, n=5):
+def scan_top_reversal(universe, n=5):
     now_ny = datetime.now(NY_TZ)
     results = []
 
@@ -960,26 +1062,60 @@ def scan_reversals(universe, n=5):
 
 
 # ============================================================
-# DIAGNOSTIC HISTORICAL CHECK
+# ATR STOP IN CILJI ZA DYNAMIC LONG KARTICO
+# ============================================================
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_atr_value(ticker):
+    try:
+        hist = yf.Ticker(ticker).history(
+            period="3mo",
+            interval="1d",
+            auto_adjust=True,
+        )
+        if hist is None or len(hist) < 20:
+            return None
+
+        high = hist["High"].astype(float)
+        low = hist["Low"].astype(float)
+        close = hist["Close"].astype(float)
+        prior_close = close.shift(1)
+
+        true_range = pd.concat(
+            [
+                high - low,
+                (high - prior_close).abs(),
+                (low - prior_close).abs(),
+            ],
+            axis=1,
+        ).max(axis=1)
+
+        atr = safe_float(true_range.rolling(14).mean().iloc[-1])
+        return atr if atr and atr > 0 else None
+    except Exception:
+        return None
+
+
+# ============================================================
+# DIAGNOSTIČNI ZGODOVINSKI TEST
 # ============================================================
 
 def backtest_ticker(ticker, holding_bars=12):
     """
-    Diagnostični izračun, ne potrjen backtest:
-    - uporablja do 30 dni 5-minutnih podatkov Yahoo Finance
-    - vstop modelira na open naslednje sveče
-    - izstop modelira po izbranem številu sveč
-    - ne rekonstruira zgodovinskega earnings filtra
-    - ne vključuje provizij, razmika, zdrsa ali kakovosti izvršitve
+    Omejen diagnostični pregled:
+    - do približno 30 dni 5-minutnih Yahoo Finance podatkov
+    - vstop na open naslednje sveče po signalu
+    - izstop po holding_bars svečah
+    - brez zgodovinskega earnings filtra, stroškov, zdrsa in modeliranja izvršitve
     """
     history = get_intraday_history(ticker, "30d")
     if history is None or history.empty:
         return []
 
-    dates = sorted({stamp.date() for stamp in history.index})
+    session_dates = sorted({stamp.date() for stamp in history.index})
     trades = []
 
-    for session_date in dates:
+    for session_date in session_dates:
         previous_close = get_previous_regular_close(history, session_date)
         if previous_close is None:
             continue
@@ -1014,7 +1150,7 @@ def backtest_ticker(ticker, holding_bars=12):
                     continue
 
                 gap_pct = (close / previous_close - 1) * 100
-                if not -8 <= gap_pct <= -1:
+                if not -8.0 <= gap_pct <= -1.0:
                     continue
 
                 crossed_up = (
@@ -1050,7 +1186,6 @@ def backtest_ticker(ticker, holding_bars=12):
 
                 entry = safe_float(bars["Open"].iloc[entry_index])
                 exit_price = safe_float(bars["Close"].iloc[exit_index])
-
                 if not entry or not exit_price:
                     continue
 
@@ -1074,7 +1209,7 @@ def backtest_ticker(ticker, holding_bars=12):
 
 
 # ============================================================
-# GEMINI COMMENTARY: COMMENT ON PROVIDED DATA
+# GEMINI: KOMENTAR PODATKOV, KI JIH JE SKENER DEJANSKO PRIKAZAL
 # ============================================================
 
 def get_gemini_comment(api_key, prompt):
@@ -1143,7 +1278,7 @@ def get_gemini_comment(api_key, prompt):
 
 
 # ============================================================
-# APP UI
+# ZAČETNI PRIKAZ IN SKENIRANJE
 # ============================================================
 
 now_ljubljana = datetime.now(LJ_TZ)
@@ -1170,9 +1305,7 @@ gemini_api_key = st.sidebar.text_input(
     type="password",
 )
 st.sidebar.caption(f"Unikatni tickerji: {len(AI_UNIVERSE)}")
-st.sidebar.caption(
-    "Podatki Yahoo Finance so lahko zakasnjeni ali nepopolni."
-)
+st.sidebar.caption("Yahoo Finance podatki so lahko zakasnjeni ali nepopolni.")
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"**Tržni režim:** {market['regime']}")
 
@@ -1180,75 +1313,183 @@ if market["spy_chg"] is not None:
     st.sidebar.caption(f"SPY 20d: {market['spy_chg']:+.2f}%")
 
 held_ticker = st.sidebar.selectbox(
-    "Delnica za pregled",
+    "Delnica za večerni pregled",
     options=list(TICKERS_CONFIG.keys()),
     index=list(TICKERS_CONFIG.keys()).index("CRWD"),
 )
 
 st.title("Value Ledger 2.0")
 st.caption(
-    "Skener prikazuje merila in kandidate. Ocena ni potrjena napoved "
-    "donosa; signal ni zagotovilo dobička, aplikacija pa ne oddaja naročil."
+    "Kandidati se izberejo dinamično iz podatkov, ki jih vrne Yahoo Finance. "
+    "Ocene so hevristične, ne potrjene napovedi donosa."
 )
 
-# ------------------------------------------------------------
-# MNDY and CRWD hero cards
-# ------------------------------------------------------------
+st.sidebar.markdown("---")
+if st.sidebar.button("Osveži skene"):
+    scan_top_long.clear()
+    scan_top_reversal.clear()
+    get_fundamental_data.clear()
+    get_intraday_history.clear()
+    get_capital_rotation.clear()
+    get_market_regime.clear()
+    st.rerun()
 
-hero_left, hero_right = st.columns(2)
+with st.spinner("Skeniram fundamentalne in intraday podatke..."):
+    top_long = scan_top_long(tuple(AI_UNIVERSE), 5)
+    top_reversals = scan_top_reversal(tuple(AI_UNIVERSE), 5)
 
-mndy_data = get_fundamental_data("MNDY")
-crwd_data = get_fundamental_data("CRWD")
+# ============================================================
+# DINAMIČNI DVE KARTICI: BEST LONG IN BEST OBRAT
+# ============================================================
 
-with hero_left:
-    mndy_price = mndy_data.get("price") if mndy_data else None
-    mndy_ps = mndy_data.get("ps") if mndy_data else None
+long_candidate = None
+if top_long and top_long[0]["score"] >= 6.5:
+    long_candidate = top_long[0]
 
-    st.markdown(
-        f"""
-        <div class="hero-mndy">
-          <div style="color:#FBBF24;font-size:0.78rem;font-weight:700;">
-            SAAS · FUNDAMENTALNI PODATKI
-          </div>
-          <div style="font-size:1.5rem;font-weight:700;color:#FFFFFF;margin-top:5px;">
-            MNDY
-          </div>
-          <div style="color:#CBD5E1;margin-top:7px;">
-            Cena: {"$" + format(mndy_price, ".2f") if mndy_price else "ni podatka"}
-            &nbsp; · &nbsp;
-            P/S: {format(mndy_ps, ".2f") if mndy_ps is not None else "ni podatka"}
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+reversal_candidate = top_reversals[0] if top_reversals else None
 
-with hero_right:
-    crwd_price = crwd_data.get("price") if crwd_data else None
-    crwd_ps = crwd_data.get("ps") if crwd_data else None
+long_col, reversal_col = st.columns(2)
 
-    st.markdown(
-        f"""
-        <div class="hero-crwd">
-          <div style="color:#6EE7B7;font-size:0.78rem;font-weight:700;">
-            CYBERSECURITY · FUNDAMENTALNI PODATKI
-          </div>
-          <div style="font-size:1.5rem;font-weight:700;color:#FFFFFF;margin-top:5px;">
-            CRWD
-          </div>
-          <div style="color:#CBD5E1;margin-top:7px;">
-            Cena: {"$" + format(crwd_price, ".2f") if crwd_price else "ni podatka"}
-            &nbsp; · &nbsp;
-            P/S: {format(crwd_ps, ".2f") if crwd_ps is not None else "ni podatka"}
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+with long_col:
+    if long_candidate:
+        item = long_candidate
+        ticker = item["ticker"]
+        price_context = get_three_year_price_context(ticker)
+        atr = get_atr_value(ticker)
+        stop = item["price"] - 1.5 * atr if atr and item.get("price") else None
+        target1 = item["price"] + 1.5 * atr if atr and item.get("price") else None
+        target2 = item["price"] + 2.5 * atr if atr and item.get("price") else None
 
-# ------------------------------------------------------------
-# Capital rotation
-# ------------------------------------------------------------
+        title = html.escape(item["name"])
+        ticker_safe = html.escape(ticker)
+        ps_text = display_value(item.get("ps"))
+        peg_text = display_value(item.get("peg"))
+        growth_text = display_value(
+            item["revenue_growth"] * 100
+            if item.get("revenue_growth") is not None
+            else None,
+            1,
+            "%",
+        )
+        fcf_margin_text = display_value(item.get("fcf_margin"), 1, "%")
+        fcf_yield_text = display_value(item.get("fcf_yield"), 1, "%")
+        net_cash_text = display_value(item.get("net_cash"), 0)
+        ws_text = display_value(wall_street_score(item), 1, "/10")
+        coverage_text = f"{item['coverage']}%"
+        historical_text = display_value(price_context, 1, "%")
+        atr_text = (
+            f"ATR {display_value(atr)} · STOP {display_value(stop)} · "
+            f"T1 {display_value(target1)} · T2 {display_value(target2)}"
+            if atr
+            else "ATR ravni niso na voljo"
+        )
+
+        st.markdown(
+            f"""
+            <div class="hero-long">
+              <div style="color:#FBBF24;font-size:0.78rem;font-weight:700;">
+                FUNDAMENTALNI LONG · HEVRISTIČNI SKEN
+              </div>
+              <div style="font-size:1.55rem;font-weight:700;color:#FFFFFF;margin-top:5px;">
+                {ticker_safe}
+              </div>
+              <div style="color:#CBD5E1;font-size:0.86rem;margin-top:2px;">
+                {title}
+              </div>
+              <div style="color:#F8FAFC;font-size:1.05rem;margin-top:10px;">
+                Cena {display_value(item.get("price"))} ·
+                Ocena {item["score"]}/10
+              </div>
+              <div style="color:#CBD5E1;font-size:0.78rem;margin-top:8px;line-height:1.7;">
+                P/S {ps_text} · PEG {peg_text} · Rast prihodkov {growth_text}<br>
+                FCF marža {fcf_margin_text} · FCF yield {fcf_yield_text} ·
+                Neto denar {net_cash_text}<br>
+                WS približek {ws_text} · Pokritost podatkov {coverage_text}<br>
+                Cena proti 3y mediani {historical_text}<br>
+                {html.escape(atr_text)}
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """
+            <div class="hero-long">
+              <div style="color:#FBBF24;font-size:0.78rem;font-weight:700;">
+                FUNDAMENTALNI LONG · HEVRISTIČNI SKEN
+              </div>
+              <div style="font-size:1.35rem;font-weight:700;color:#FFFFFF;margin-top:12px;">
+                NI STROGEGA KANDIDATA
+              </div>
+              <div style="color:#CBD5E1;font-size:0.82rem;margin-top:10px;">
+                Noben ticker v trenutnem skenu ni dosegel minimalne ocene
+                ob izpolnjenih filtrih za likvidnost, P/S, PEG in rast.
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+with reversal_col:
+    if reversal_candidate:
+        item = reversal_candidate
+        ticker_safe = html.escape(item["Ticker"])
+        st.markdown(
+            f"""
+            <div class="hero-reversal">
+              <div style="color:#6EE7B7;font-size:0.78rem;font-weight:700;">
+                NAJBOLJŠI UJEMANJE INTRADAY FILTROV · NI NAPOVED
+              </div>
+              <div style="font-size:1.55rem;font-weight:700;color:#FFFFFF;margin-top:5px;">
+                {ticker_safe}
+              </div>
+              <div style="color:#CBD5E1;font-size:0.86rem;margin-top:2px;">
+                {html.escape(item["Seja"])} · {html.escape(item["Čas"])}
+              </div>
+              <div style="color:#F8FAFC;font-size:1.05rem;margin-top:10px;">
+                Cena {item["Cena"]} · Ocena {item["Ocena (hevristika)"]}/10
+              </div>
+              <div style="color:#CBD5E1;font-size:0.78rem;margin-top:8px;line-height:1.7;">
+                Gap {item["Gap proti prejšnjemu close %"]:+.2f}% ·
+                VWAP {item["VWAP"]} ({item["Odstopanje od VWAP %"]:+.2f}%)<br>
+                Volumen proti isti uri {item["Volumen proti isti uri x"]}x ·
+                RSI {item["RSI 5m"]} · Momentum {item["Momentum %"]:+.2f}%<br>
+                Filtri vključujejo zeleno svečo, VWAP reclaim in preverjene earnings.
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """
+            <div class="hero-reversal">
+              <div style="color:#6EE7B7;font-size:0.78rem;font-weight:700;">
+                NAJBOLJŠI UJEMANJE INTRADAY FILTROV · NI NAPOVED
+              </div>
+              <div style="font-size:1.35rem;font-weight:700;color:#FFFFFF;margin-top:12px;">
+                NI STROGEGA KANDIDATA
+              </div>
+              <div style="color:#CBD5E1;font-size:0.82rem;margin-top:10px;">
+                Trenutno ni delnice, ki bi prestala vse pogoje. Skener ne bo
+                izbral kandidata na silo.
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+st.caption(
+    "Zlata kartica pokaže najvišje uvrščen fundamentalni kandidat, če doseže "
+    "oceno najmanj 6,5/10. Zelena kartica pokaže najvišje uvrščen današnji "
+    "reversal kandidat. Obe oceni sta hevristični; ne zagotavljata uspešnega posla."
+)
+
+
+# ============================================================
+# SEKTORSKA ROTACIJA
+# ============================================================
 
 st.subheader("Capital Rotation Radar")
 
@@ -1280,131 +1521,121 @@ else:
     st.info("Sektorski podatki trenutno niso na voljo.")
 
 st.caption(
-    "Primerjava ETF-jev kaže relativno gibanje cen proti SPY, "
-    "ne neposrednih nakupnih ali prodajnih tokov Wall Streeta."
+    "ETF primerjava kaže relativno gibanje cen proti SPY, ne neposrednih "
+    "nakupnih ali prodajnih tokov Wall Streeta."
 )
 
-# ------------------------------------------------------------
-# Fundamental screen
-# ------------------------------------------------------------
 
-st.subheader(
-    "Fundamentalni pregled · hevristika, ne potrjena primerjava"
-)
+# ============================================================
+# TOP 5 LONG: ISTI PODATKI KOT ZLATA KARTICA
+# ============================================================
+
+st.subheader("TOP 5 Long · fundamentalni heuristični pregled")
 st.caption(
-    "Točkovanje je ročno določena, nebacktestirana hevristika. "
-    "Razvrstitev ne dokazuje, da je delnica podcenjena ali da bo "
-    "presegla druge. P/S ni primerljiv med vsemi sektorji; PEG in "
-    "podatki Yahoo Finance so lahko manjkajoči ali zastareli."
+    "Točkovanje je ročno določena hevristika, ne potrjen model pričakovanega "
+    "donosa. P/S se med sektorji ne primerja kot enotna mera poštene vrednosti."
 )
 
-with st.spinner("Pregledujem temeljne podatke univerzuma..."):
-    fundamental_rows = scan_fundamental_universe(tuple(AI_UNIVERSE))
+if top_long:
+    long_rows = []
 
-if fundamental_rows:
-    top_rows = fundamental_rows[:5]
-    displayed = []
+    for item in top_long:
+        price_context = get_three_year_price_context(item["ticker"])
+        growth = item.get("revenue_growth")
+        atr = get_atr_value(item["ticker"])
+        stop = item["price"] - 1.5 * atr if atr and item.get("price") else None
+        target1 = item["price"] + 1.5 * atr if atr and item.get("price") else None
 
-    for row in top_rows:
-        price_vs_median = get_three_year_price_context(row["ticker"])
-        growth = row.get("revenue_growth")
-
-        displayed.append({
-            "Ticker": row["ticker"],
-            "Podjetje": row["name"],
-            "Hevristična ocena / 10": row["heuristic_score"],
-            "Pokritost meril %": row["data_coverage"],
-            "Cena $": display_value(row.get("price")),
-            "P/S": display_value(row.get("ps")),
-            "PEG": display_value(row.get("peg")),
+        long_rows.append({
+            "Ticker": item["ticker"],
+            "Podjetje": item["name"],
+            "Ocena / 10": item["score"],
+            "Pokritost %": item["coverage"],
+            "Cena": display_value(item.get("price")),
+            "P/S": display_value(item.get("ps")),
+            "PEG": display_value(item.get("peg")),
             "Rast prihodkov %": display_value(
                 growth * 100 if growth is not None else None,
                 1,
+                "%",
             ),
-            "FCF marža %": display_value(
-                row.get("fcf_margin"),
-                1,
-            ),
-            "Neto denar $": display_value(
-                row.get("net_cash"),
-                0,
-            ),
-            "Analitiki": display_value(
-                row.get("analyst_count"),
-                0,
-            ),
-            "Ciljna rast analitikov %": display_value(
-                row.get("analyst_upside"),
+            "FCF marža %": display_value(item.get("fcf_margin"), 1, "%"),
+            "FCF yield %": display_value(item.get("fcf_yield"), 1, "%"),
+            "WS približek / 10": display_value(
+                wall_street_score(item),
                 1,
             ),
             "Cena proti 3y mediani %": display_value(
-                price_vs_median,
+                price_context,
                 1,
+                "%",
             ),
+            "ATR STOP": display_value(stop),
+            "ATR T1": display_value(target1),
         })
 
-    render_dark_table(pd.DataFrame(displayed))
+    render_dark_table(pd.DataFrame(long_rows))
 else:
     st.info(
-        "Ni delnic z dovolj razpoložljivimi podatki, ki bi prestale "
-        "nastavljeni filter likvidnosti."
+        "Ni fundamentalnega kandidata, ki bi prestal trenutne filtre "
+        "in dosegel minimalno oceno."
     )
 
 st.caption(
-    "»Cena proti 3y mediani« primerja samo zgodovinsko ceno. "
-    "Ni zgodovinski P/S ali dokaz podcenjenosti. Za primerjavo valuacije "
-    "bi potrebovali zanesljive zgodovinske prihodke in tržno kapitalizacijo."
+    "»Cena proti 3y mediani« primerja ceno z zgodovinsko mediano cene; "
+    "ni zgodovinski P/S in sama ne dokazuje podcenjenosti."
 )
 
-# ------------------------------------------------------------
-# Intraday reversal scan
-# ------------------------------------------------------------
+
+# ============================================================
+# TOP 5 REVERSAL: ISTI PODATKI KOT ZELENA KARTICA
+# ============================================================
 
 st.subheader("TOP 5 Intraday Reversal")
 st.caption(
-    "Premarket VWAP se računa ločeno od začetka premarketa. "
-    "VWAP redne seje se ponastavi ob 09:30 ET. Volumen se primerja "
-    "z isto 5-minutno uro in isto vrsto seje v preteklih dneh."
+    "Premarket in redna seja imata ločen VWAP. Volumen se primerja z isto "
+    "5-minutno uro v preteklih sejah iste vrste."
 )
 
 if st.button("Osveži intraday skener"):
-    scan_reversals.clear()
+    scan_top_reversal.clear()
     get_intraday_history.clear()
     st.rerun()
 
-with st.spinner("Pregledujem intraday podatke..."):
-    reversal_rows = scan_reversals(tuple(AI_UNIVERSE), 5)
+# Uporabi lahko svež rezultat po pritisku gumba ali rezultat v cache-u.
+top_reversals = scan_top_reversal(tuple(AI_UNIVERSE), 5)
 
-if reversal_rows:
-    render_dark_table(pd.DataFrame(reversal_rows))
+if top_reversals:
+    render_dark_table(pd.DataFrame(top_reversals))
 else:
     st.info(
         "NI STROGEGA KANDIDATA. Filter zahteva gap od -1 % do -8 %, "
-        "dejanski preboj VWAP-a navzgor, zeleno zaključeno svečo, RSI "
-        "pod 35, volumen vsaj 1,3× primerljive sveče, pozitiven momentum "
+        "dejanski prehod izpod VWAP-a nad njega, zeleno zaključeno svečo, "
+        "RSI pod 35, volumen vsaj 1,3× glede na isto uro, pozitiven momentum "
         "in uspešno preverjene earnings podatke."
     )
 
 st.warning(
-    "Premarket je pogosto manj likviden in njegovi podatki so lahko "
-    "nepopolni. Prestani pogoji pomenijo samo, da se številke ujemajo "
-    "s filtrom, ne pa, da je setup A+ ali dobičkonosen."
+    "Premarket je pogosto manj likviden, podatki pa so lahko nepopolni. "
+    "Prestani filtri pomenijo le ujemanje s pravili, ne pa zagotovila "
+    "dobička ali potrditve za nakup."
 )
 
-# ------------------------------------------------------------
-# Diagnostic backtest
-# ------------------------------------------------------------
+
+# ============================================================
+# DIAGNOSTIČNI BACKTEST
+# ============================================================
 
 st.subheader("Diagnostični zgodovinski test")
 st.caption(
-    "Za izbrane tickerje uporabi do približno 30 dni 5-minutnih podatkov. "
-    "Vstop je modeliran na naslednji sveči, izhod po 12 svečah. "
-    "Zgodovinski earnings filter, stroški, zdrs in realistična izvršitev "
-    "niso vključeni; rezultat ni dokaz trgovalne prednosti."
+    "Do približno 30 dni 5-minutnih podatkov za izbrane tickre. Vstop je "
+    "modeliran na naslednji sveči, izstop po 12 svečah. Brez zgodovinskega "
+    "earnings filtra, provizij, zdrsa in realističnega modela izvršitve; "
+    "rezultat ni dokaz trgovalne prednosti."
 )
 
 backtest_tickers = st.multiselect(
-    "Tickerji za test (izberi manjše število)",
+    "Tickerji za test",
     options=AI_UNIVERSE,
     default=["CRWD", "MNDY", "NOW"],
     max_selections=5,
@@ -1414,101 +1645,194 @@ if st.button("Zaženi diagnostični backtest"):
     if not backtest_tickers:
         st.warning("Izberi vsaj en ticker.")
     else:
-        with st.spinner("Prenos in obdelava zgodovinskih podatkov..."):
-            trades = []
-            for ticker in backtest_tickers:
-                trades.extend(backtest_ticker(ticker))
+        trades = []
 
-            backtest_frame = pd.DataFrame(trades)
+        with st.spinner("Obdelujem zgodovinske 5-minutne podatke..."):
+            for ticker in backtest_tickers:
+                history = get_intraday_history(ticker, "30d")
+                if history is None or history.empty:
+                    continue
+
+                session_dates = sorted({
+                    stamp.date() for stamp in history.index
+                })
+
+                for session_date in session_dates:
+                    previous_close = get_previous_regular_close(
+                        history,
+                        session_date,
+                    )
+                    if previous_close is None:
+                        continue
+
+                    for session_kind in ("premarket", "regular"):
+                        bars = get_session_bars(
+                            history,
+                            session_date,
+                            session_kind,
+                        )
+                        if len(bars) < 16:
+                            continue
+
+                        vwap = anchored_vwap_series(bars)
+                        closes = bars["Close"].astype(float)
+                        opens = bars["Open"].astype(float)
+
+                        for index in range(15, len(bars) - 13):
+                            close = safe_float(closes.iloc[index])
+                            open_price = safe_float(opens.iloc[index])
+                            previous_bar_close = safe_float(closes.iloc[index - 1])
+                            current_vwap = safe_float(vwap.iloc[index])
+                            previous_vwap = safe_float(vwap.iloc[index - 1])
+
+                            if any(value is None for value in (
+                                close,
+                                open_price,
+                                previous_bar_close,
+                                current_vwap,
+                                previous_vwap,
+                            )):
+                                continue
+
+                            gap_pct = (close / previous_close - 1) * 100
+                            if not -8 <= gap_pct <= -1:
+                                continue
+
+                            crossed_up = (
+                                float(closes.iloc[index - 1]) <= previous_vwap
+                                and close > current_vwap
+                            )
+                            if not crossed_up or close <= open_price:
+                                continue
+
+                            rsi = calculate_rsi(closes.iloc[:index + 1])
+                            if rsi is None or rsi >= 35:
+                                continue
+
+                            timestamp = bars.index[index]
+                            volume_ratio = same_time_volume_ratio(
+                                history,
+                                timestamp,
+                                bars,
+                                index,
+                            )
+                            if volume_ratio is None or volume_ratio < 1.3:
+                                continue
+
+                            momentum = (close / previous_bar_close - 1) * 100
+                            if momentum <= 0:
+                                continue
+
+                            entry_index = index + 1
+                            exit_index = min(entry_index + 12, len(bars) - 1)
+                            entry = safe_float(bars["Open"].iloc[entry_index])
+                            exit_price = safe_float(bars["Close"].iloc[exit_index])
+
+                            if not entry or not exit_price:
+                                continue
+
+                            trades.append({
+                                "Datum": str(session_date),
+                                "Ticker": ticker,
+                                "Seja": (
+                                    "Premarket"
+                                    if session_kind == "premarket"
+                                    else "Redna"
+                                ),
+                                "Vstop": round(entry, 2),
+                                "Izhod": round(exit_price, 2),
+                                "Donos %": round(
+                                    (exit_price / entry - 1) * 100,
+                                    2,
+                                ),
+                            })
+
+                            # Največ en signal na ticker na dan in sejo.
+                            break
+
+        backtest_frame = pd.DataFrame(trades)
 
         if backtest_frame.empty:
             st.info(
-                "V prenesenih podatkih ni bilo najdenih setupov po pravilih."
+                "V pridobljenih podatkih ni bilo najdenega setupa po teh pravilih."
             )
         else:
             win_rate = (
-                backtest_frame["Donos %"] > 0
-            ).mean() * 100
+                (backtest_frame["Donos %"] > 0).mean() * 100
+            )
             average_return = backtest_frame["Donos %"].mean()
             median_return = backtest_frame["Donos %"].median()
 
             metric1, metric2, metric3, metric4 = st.columns(4)
             metric1.metric("Posli", len(backtest_frame))
             metric2.metric("Pozitivni posli", f"{win_rate:.1f}%")
-            metric3.metric(
-                "Povprečni donos",
-                f"{average_return:.2f}%",
-            )
-            metric4.metric(
-                "Mediani donos",
-                f"{median_return:.2f}%",
-            )
+            metric3.metric("Povprečni donos", f"{average_return:.2f}%")
+            metric4.metric("Mediani donos", f"{median_return:.2f}%")
 
             render_dark_table(backtest_frame)
 
             st.warning(
-                "Rezultat je diagnostičen, ne potrjen backtest: vzorec je "
-                "omejen, zgodovinska earnings zaščita manjka, podatki so "
-                "odvisni od ponudnika, stroški in zdrs pa niso vključeni."
+                "To je omejen diagnostični izračun, ne potrjen backtest. "
+                "Ne vključuje zgodovinskih earnings informacij, stroškov "
+                "ali zdrsa."
             )
 
-# ------------------------------------------------------------
-# AI analyst
-# ------------------------------------------------------------
+
+# ============================================================
+# AI ANALITIK
+# ============================================================
 
 st.subheader("Avtonomni AI Analitik")
 st.caption(
-    "Analitik komentira podatke, ki jih je skener dejansko prikazal. "
-    "Ne sme si izmišljati manjkajočih metrik ali obljubljati donosa."
+    "AI komentira dejanske podatke, prikazane v skenu. Ne sme si izmišljati "
+    "manjkajočih meritev ali obljubljati donosa."
 )
 
 if st.button("Zaženi AI komentar trga"):
     if not gemini_api_key:
         st.error("Vnesi Gemini API ključ za AI komentar.")
     else:
-        fundamental_context = [
+        long_context = [
             {
-                "ticker": row["ticker"],
-                "heuristic_score": row["heuristic_score"],
-                "data_coverage_pct": row["data_coverage"],
-                "price": row.get("price"),
-                "ps": row.get("ps"),
-                "peg": row.get("peg"),
-                "revenue_growth": row.get("revenue_growth"),
-                "fcf_margin": row.get("fcf_margin"),
-                "net_cash": row.get("net_cash"),
-                "analyst_upside": row.get("analyst_upside"),
+                "ticker": item["ticker"],
+                "score": item["score"],
+                "coverage": item["coverage"],
+                "price": item.get("price"),
+                "ps": item.get("ps"),
+                "peg": item.get("peg"),
+                "revenue_growth": item.get("revenue_growth"),
+                "fcf_margin": item.get("fcf_margin"),
+                "fcf_yield": item.get("fcf_yield"),
+                "net_cash": item.get("net_cash"),
+                "analyst_upside": item.get("analyst_upside"),
             }
-            for row in fundamental_rows[:5]
+            for item in top_long
         ]
 
         prompt = f"""
-Odgovori v slovenščini kot previden analitik podatkov.
+Odgovori v slovenščini kot previden analitik.
 
-Uporabi samo spodaj navedene podatke. Ne izmišljaj si cen, novic,
-earnings datumov, tokov kapitala ali prihodnjih donosov.
-ETF relativna moč je cenovni približek in ni neposredno merjenje
-tokov denarja.
-Hevristična temeljna ocena ni potrjena primerjava valuacije in ni
-napoved donosa.
-Če reversal kandidatov ni, napiši "NI STROGEGA KANDIDATA".
-Ne obljubljaj dobička in ne označi signala kot zagotovljenega.
+Uporabi samo spodnje podatke. Ne izmišljaj si cen, novic, earnings datumov,
+tokov kapitala ali prihodnjih donosov.
+Relativna moč ETF-jev je cenovni približek, ne neposredno merjenje tokov denarja.
+Fundamentalna ocena je hevristika, ne potrjena primerjava poštene vrednosti.
+Če kandidatov ni, napiši "NI STROGEGA KANDIDATA".
+Ne obljubljaj dobička in nobenega kandidata ne imenuj zagotovljenega zmagovalca.
 
 Tržni režim: {market}
 Sektorska relativna moč: {rotation}
-Fundamentalni kandidati: {fundamental_context}
-Intraday reversal kandidati: {reversal_rows}
+Fundamentalni kandidati: {long_context}
+Intraday reversal kandidati: {top_reversals}
 
 Odgovori v treh kratkih delih:
-1. Tržni režim in kaj kaže relativna moč sektorjev.
-2. Kaj kažejo temeljni podatki in njihove omejitve.
-3. Ali so reversal kandidati prestali prikazane filtre; navedi njihove
-   dejanske številke.
-Če pomemben podatek manjka, ga označi kot manjkajoč.
+1. Tržni režim in relativna moč sektorjev.
+2. Kaj kažejo fundamentalni kandidati in katere so omejitve.
+3. Ali je reversal kandidat prestal filtre; navedi samo podatke iz seznama.
+Če je pomemben podatek manjkajoč, to jasno napiši.
 """
 
         try:
-            with st.spinner("Pripravljam AI komentar prikazanih podatkov..."):
+            with st.spinner("Pripravljam komentar prikazanih podatkov..."):
                 model_name, report = get_gemini_comment(
                     gemini_api_key,
                     prompt,
@@ -1520,7 +1844,9 @@ Odgovori v treh kratkih delih:
         except Exception as error:
             st.error(f"AI komentar ni uspel: {error}")
 
+
 st.caption(
-    "Skener se zažene ob nalaganju strani ali ob ročni osvežitvi. "
-    "Aplikacija ne spremlja trga v ozadju in ne pošilja samodejnih opozoril."
+    "Podatki se osvežijo ob ponovnem zagonu aplikacije ali s klikom na "
+    "Osveži skene. Aplikacija ne spremlja trga v ozadju in ne pošilja "
+    "samodejnih opozoril."
 )
