@@ -16,8 +16,6 @@ section[data-testid="stSidebar"] { background-color: #0A0D14 !important; }
 .mndy-hero-card { background: linear-gradient(145deg, rgba(20,17,10,0.8) 0%, rgba(10,9,6,0.9) 100%); border: 1.5px solid rgba(245,158,11,0.6); border-radius: 18px; padding: 24px 26px; margin-bottom: 22px; }
 .aplus-badge { display: inline-flex; border: 1.2px solid #F59E0B; color: #FBBF24; font-size: 0.76rem; padding: 3px 12px; border-radius: 9999px; }
 .badge-sector { font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.04); color: #94A3B8; text-transform: uppercase; }
-.metric-label { color:#94A3B8; font-size:0.7rem; text-transform:uppercase; }
-.metric-value { font-size:1.02rem; color:#F8FAFC; }
 div.stButton > button { background: linear-gradient(135deg,#F59E0B 0%,#D97706 100%) !important; color:#0A0D14 !important; font-weight:600 !important; border:none !important; border-radius:10px !important; padding:12px 24px !important; }
 </style>""", unsafe_allow_html=True)
 
@@ -49,7 +47,7 @@ def get_live_data():
             prev = info.get("regularMarketPreviousClose") or price
             chg = ((price - prev) / prev * 100) if prev else 0.0
             ps = info.get("priceToSalesTrailing12Months") or 0.0
-            results[t] = {"price": round(price,2), "chg": round(chg,2), "ps": round(ps,2)}
+            results[t] = {"price": round(float(price),2), "chg": round(float(chg),2), "ps": round(float(ps),2)}
         except Exception:
             results[t] = {"price": 106.86 if t=="MNDY" else 325.0, "chg": 0.0, "ps": 3.3}
     return results
@@ -82,6 +80,13 @@ def king_adjusted_score(base_score, ticker):
     if ticker == "MNDY":
         adj += 0.5
     return max(0.0, min(10.0, round(adj,1)))
+
+def log_king_score(kind, ticker, score, extra=""):
+    try:
+        with open("king_log.csv", "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now().isoformat()},{kind},{ticker},{score},{extra}\n")
+    except Exception:
+        pass
 
 def parse_wallstreet(info, price):
     try:
@@ -130,9 +135,13 @@ def get_history_edge(ticker, price_f, fcf, mcap):
         fcf_y = 0.0
         if fcf and mcap and mcap > 0:
             fcf_y = float(fcf) / float(mcap) * 100
-            if fcf_y > 5: bonus += 1.0
-            elif fcf_y > 3: bonus += 0.5
-            elif fcf_y < 0: bonus -= 0.5
+            # KING GUARD: nemogoc yield = yfinance napaka, brez bonusa
+            if fcf_y > 15.0 or fcf_y < -10.0:
+                fcf_y = max(-10.0, min(fcf_y, 15.0))
+            else:
+                if fcf_y > 5: bonus += 1.0
+                elif fcf_y > 3: bonus += 0.5
+                elif fcf_y < 0: bonus -= 0.5
         return {"bonus": round(bonus,2), "vs_med": round(vs_med,1), "fcf_yield": round(fcf_y,2)}
     except Exception:
         return {"bonus": 0.0, "vs_med": 0.0, "fcf_yield": 0.0}
@@ -149,6 +158,17 @@ def get_intraday_df(ticker, period="1d", interval="5m"):
     except Exception:
         return None
 
+def tactical_vwap(df):
+    try:
+        typ = (df["High"].astype(float) + df["Low"].astype(float) + df["Close"].astype(float)) / 3.0
+        vol = df["Volume"].astype(float)
+        vsum = float(vol.sum())
+        if vsum <= 0:
+            return float(df["Close"].iloc[-1])
+        return float((typ * vol).cumsum().iloc[-1] / vsum)
+    except Exception:
+        return float(df["Close"].iloc[-1])
+
 def tactical_intraday_signal(df):
     if df is None or len(df) < 12:
         return None
@@ -157,8 +177,7 @@ def tactical_intraday_signal(df):
     last = float(close.iloc[-1])
     prev = float(close.iloc[-2])
     day_open = float(df["Open"].iloc[0])
-    vol_sum = float(volume.cumsum().iloc[-1])
-    vwap = float(((close*volume).cumsum().iloc[-1]/vol_sum)) if vol_sum else last
+    vwap = tactical_vwap(df)
     ema9 = float(close.ewm(span=9, adjust=False).mean().iloc[-1])
     ema20 = float(close.ewm(span=20, adjust=False).mean().iloc[-1])
     avg_vol20 = float(volume.tail(20).mean()) if len(volume)>=20 else float(volume.mean())
@@ -175,19 +194,73 @@ def tactical_intraday_signal(df):
     elif vol_ratio<=0.8: score-=0.5
     if rel_open<-2.5: score-=0.75
     score = max(0.0,min(10.0,score))
-    return {"score":round(score,1),"last":round(last,2),"rel_open":round(rel_open,2),"rel_vwap":round(rel_vwap,2),"momentum":round(momentum,2),"vol_ratio":round(vol_ratio,2)}
+    return {"score":round(score,1),"last":round(last,2),"vwap":round(vwap,2),"rel_open":round(rel_open,2),"rel_vwap":round(rel_vwap,2),"momentum":round(momentum,2),"vol_ratio":round(vol_ratio,2)}
+
+def is_green_reclaim(df):
+    try:
+        last_o = float(df["Open"].iloc[-1])
+        last_c = float(df["Close"].iloc[-1])
+        vwap = tactical_vwap(df)
+        return (last_c > last_o) and ((last_c / vwap - 1) * 100 >= -0.3)
+    except Exception:
+        return False
+
+def get_rsi_5m(df, period=14):
+    try:
+        c = df["Close"].astype(float)
+        d = c.diff()
+        up = d.clip(lower=0).rolling(period).mean()
+        down = (-d.clip(upper=0)).rolling(period).mean()
+        rs = up / down.replace(0, float("nan"))
+        rsi = 100 - (100 / (1 + rs))
+        v = float(rsi.iloc[-1])
+        return v if v == v else 50.0
+    except Exception:
+        return 50.0
+
+def has_earnings_soon(ticker, days=5):
+    try:
+        ed = yf.Ticker(ticker).get_earnings_dates(limit=2)
+        if ed is None or (isinstance(ed, pd.DataFrame) and ed.empty):
+            return False
+        earn_date = pd.to_datetime(ed.index[0]).tz_localize(None)
+        delta = (earn_date - datetime.now()).days
+        return 0 <= delta <= days
+    except Exception:
+        return False
+
+def get_atr_levels(ticker, price, mult_stop=1.5, mult_t1=1.5, mult_t2=2.5):
+    try:
+        d = yf.Ticker(ticker).history(period="3mo", interval="1d", auto_adjust=False)
+        if d is None or len(d) < 20:
+            return None
+        h, l, c = d["High"].astype(float), d["Low"].astype(float), d["Close"].astype(float)
+        pc = c.shift(1)
+        tr = pd.concat([h-l, (h-pc).abs(), (l-pc).abs()], axis=1).max(axis=1)
+        atr = float(tr.rolling(14).mean().iloc[-1])
+        if not atr or atr != atr:
+            return None
+        return {"atr": round(atr,2), "stop": round(price - atr*mult_stop,2), "t1": round(price + atr*mult_t1,2), "t2": round(price + atr*mult_t2,2)}
+    except Exception:
+        return None
 
 def get_asymmetry_score(ticker):
     try:
         info = yf.Ticker(ticker).info
-        ps = info.get("priceToSalesTrailing12Months") or 20.0
-        # varovalka proti yfinance napaki kot TSM 0.44
-        if float(ps) < 1.0:
-            ps = 20.0
+        ps_raw = info.get("priceToSalesTrailing12Months")
+        # KING GUARD proti yfinance napaki kot TSM 0.44
+        if ps_raw is None or float(ps_raw) < 1.0:
+            return {"score": 0.0, "ps": 20.0, "peg": 99.0, "growth": 0.0, "price": 0.0, "net_cash": 0, "debt": 1, "ws_score": 0, "ws_rec": 0, "ws_upside": 0, "ws_num": 0, "vs_med": 0, "fcf_yield": 0, "bad_data": True}
+        ps = float(ps_raw)
         peg = info.get("pegRatio") or 2.0
+        peg = float(peg)
         gr = info.get("revenueGrowth") or 0.15
-        if isinstance(gr, float) and gr > 1.0:
+        gr = float(gr)
+        if gr > 1.0:
             gr = gr / 100.0
+        # KING GUARD: 50.9% spike odrezi
+        if gr > 0.40:
+            gr = 0.25
         price = info.get("currentPrice") or info.get("regularMarketPrice") or 0.0
         price_f = float(price) if price else 0.0
         cash = info.get("totalCash") or 0.0
@@ -195,8 +268,8 @@ def get_asymmetry_score(ticker):
         fcf = info.get("freeCashflow") or 0.0
         rev = info.get("totalRevenue") or 0.0
         mcap = info.get("marketCap") or 0.0
-        fcf_m = (fcf / rev * 100) if fcf and rev else 0.0
-        net_cash = cash - debt
+        fcf_m = (float(fcf) / float(rev) * 100) if fcf and rev else 0.0
+        net_cash = float(cash) - float(debt)
         s = 5.0
         if ps < 4: s += 3.0
         elif ps < 7: s += 2.0
@@ -217,7 +290,7 @@ def get_asymmetry_score(ticker):
         he = get_history_edge(ticker, price_f, fcf, mcap)
         s += he["bonus"]
         s = max(0.0, min(10.0, s))
-        return {"score": king_adjusted_score(round(s,1), ticker), "ps": round(float(ps),2), "peg": round(float(peg),2), "growth": round(float(gr)*100,1), "price": round(price_f,2), "net_cash": net_cash, "debt": debt, "ws_score": ws["ws_score"], "ws_rec": ws["rec"], "ws_upside": ws["upside"], "ws_num": ws["num"], "vs_med": he["vs_med"], "fcf_yield": he["fcf_yield"]}
+        return {"score": king_adjusted_score(round(s,1), ticker), "ps": round(float(ps),2), "peg": round(float(peg),2), "growth": round(float(gr)*100,1), "price": round(price_f,2), "net_cash": net_cash, "debt": debt, "ws_score": ws["ws_score"], "ws_rec": ws["rec"], "ws_upside": ws["upside"], "ws_num": ws["num"], "vs_med": he["vs_med"], "fcf_yield": he["fcf_yield"], "bad_data": False}
     except Exception:
         return None
 
@@ -235,35 +308,12 @@ def get_liquidity_ok(ticker):
     except Exception:
         return True
 
-def get_rsi_5m(df, period=14):
-    try:
-        c = df["Close"].astype(float)
-        d = c.diff()
-        up = d.clip(lower=0).rolling(period).mean()
-        down = (-d.clip(upper=0)).rolling(period).mean()
-        rs = up / down.replace(0, float("nan"))
-        rsi = 100 - (100 / (1 + rs))
-        return float(rsi.iloc[-1])
-    except Exception:
-        return 50.0
-
-def has_earnings_soon(ticker, days=5):
-    try:
-        ed = yf.Ticker(ticker).get_earnings_dates(limit=2)
-        if ed is None or (isinstance(ed, pd.DataFrame) and ed.empty):
-            return False
-        earn_date = pd.to_datetime(ed.index[0]).tz_localize(None)
-        delta = (earn_date - datetime.now()).days
-        return 0 <= delta <= days
-    except Exception:
-        return False
-
 @st.cache_data(ttl=1800)
 def scan_best_long():
     best = None
     for t in AI_UNIVERSE:
         r = get_asymmetry_score(t)
-        if r is None:
+        if r is None or r.get("bad_data"):
             continue
         if r["ps"] > 20 or r["peg"] > 2.8 or r["growth"] < 12:
             continue
@@ -275,6 +325,8 @@ def scan_best_long():
             continue
         if best is None or r["score"] > best["signal"]["score"]:
             best = {"ticker": t, "signal": r}
+    if best is not None:
+        log_king_score("LONG", best["ticker"], best["signal"]["score"], f'PS{best["signal"]["ps"]}')
     return best
 
 @st.cache_data(ttl=600)
@@ -296,12 +348,16 @@ def scan_best_reversal():
             continue
         if get_rsi_5m(df) > 35:
             continue
+        if not is_green_reclaim(df):
+            continue
         if has_earnings_soon(t, 5):
             continue
         if sig["score"] < 6.0:
             continue
         if best is None or sig["score"] > best["signal"]["score"]:
             best = {"ticker": t, "signal": sig}
+    if best is not None:
+        log_king_score("REVERSAL", best["ticker"], best["signal"]["score"])
     return best
 
 @st.cache_data(ttl=1800)
@@ -309,7 +365,7 @@ def scan_top_long(n=5):
     out = []
     for t in AI_UNIVERSE:
         r = get_asymmetry_score(t)
-        if r is None:
+        if r is None or r.get("bad_data"):
             continue
         if r["ps"] > 20 or r["peg"] > 2.8 or r["growth"] < 12:
             continue
@@ -336,9 +392,19 @@ def scan_top_reversal(n=5):
         sig["earn"] = earn
         if not (-8.0 <= sig.get("rel_open", 0) <= -1.0):
             continue
+        if sig.get("rel_vwap", 0) < -2.0:
+            continue
         if sig.get("vol_ratio", 0) < 1.3:
             continue
+        if sig.get("momentum", 0) < 0:
+            continue
+        if rsi > 35:
+            continue
+        if not is_green_reclaim(df):
+            continue
         if earn:
+            continue
+        if sig["score"] < 6.0:
             continue
         out.append((t, sig))
     out.sort(key=lambda x: x[1]["score"], reverse=True)
@@ -357,6 +423,8 @@ def build_ai_context():
     for x in topR:
         s = x["signal"]
         lines.append("- " + x["ticker"] + " sc " + str(s["score"]) + " open " + str(s.get("rel_open")) + "% vwap " + str(s.get("rel_vwap")) + "% vol " + str(s.get("vol_ratio")) + "x RSI " + str(s.get("rsi")))
+    if not topR:
+        lines.append("- NI STROGEGA KANDIDATA (vsi padejo na RSI/vol/momentum/green/earnings)")
     return "\n".join(lines)
 
 def get_evening_decision(held_ticker):
@@ -393,6 +461,9 @@ bestL = scan_best_long()
 bestR = scan_best_reversal()
 if bestL is not None:
     l_txt = str(bestL["ticker"]) + " " + str(bestL["signal"]["score"]) + "/10 P/S " + str(bestL["signal"]["ps"]) + " PEG " + str(bestL["signal"]["peg"])
+    lv = get_atr_levels(bestL["ticker"], bestL["signal"]["price"])
+    if lv:
+        l_txt += f' | ATR {lv["atr"]} STOP {lv["stop"]} T1 {lv["t1"]} T2 {lv["t2"]}'
 else:
     l_txt = "NI STROGEGA KANDIDATA"
 if bestR is not None:
@@ -407,7 +478,7 @@ if is_preclose_window() and evening["held"] is not None:
     st.markdown('<div class="ledger-card"><div style="font-weight:700;">Vecerni pregled ' + str(held_ticker) + ': <span style="color:' + col + ';">' + act + '</span></div></div>', unsafe_allow_html=True)
 
 m = data.get("MNDY", {"price": 106.86, "chg": 0.0, "ps": 3.3})
-st.markdown('<div class="mndy-hero-card"><span style="font-size:1.35rem;font-weight:700;color:#FFFFFF;">MNDY</span> <span class="badge-sector">SaaS</span><div style="font-size:1.7rem;color:#fff;">$' + str(m["price"]) + '</div><div style="color:#F59E0B;">Ocena Asimetrije: 9.4 / 10</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="mndy-hero-card"><span style="font-size:1.35rem;font-weight:700;color:#FFFFFF;">MNDY</span> <span class="badge-sector">SaaS</span><div style="font-size:1.7rem;color:#fff;">$' + str(m["price"]) + '</div><div style="color:#F59E0B;">Ocena Asimetrije: 9.4 / 10 | SaaS strah = popust</div></div>', unsafe_allow_html=True)
 
 c = data.get("CRWD", {"price": 325.0, "chg": 0.0, "ps": 17.0})
 st.markdown('<div class="ledger-card"><span style="font-size:1.25rem;font-weight:700;color:#FFFFFF;">CRWD</span> <span class="aplus-badge">A+ SETUP</span><div style="font-size:1.55rem;color:#fff;">$' + str(c["price"]) + '</div></div>', unsafe_allow_html=True)
@@ -449,7 +520,7 @@ if st.button("POZENI AVTONOMNI AI PREGLED TRGA"):
     else:
         with st.spinner("Povezovanje z Gemini AI..."):
             ctx = build_ai_context()
-            prompt_text = "Ti si analitik Value Ledger 2.0.\n" + ctx + "\nCene10: " + str(data) + "\nIzberi 1 BEST LONG za asimetrijo + 1 BEST DIP tik pred obratom kot CRWD +0.2% -> +8.2% + 1 za izogib. Za vsakega 3 razlogi s stevilkami P/S PEG WS RSI VWAP volumen earnings. Odgovori v slovenscini z ocenami 1-10."
+            prompt_text = "Ti si analitik Value Ledger 2.0 KING.\n" + ctx + "\nCene10: " + str(data) + "\nPRAVILA: TSM in vsak ticker z bad_data ali FCFy>15% ali P/S fallback 20.0 IGNORIRAJ kot pokvarjen podatek, ne kot BEST. MNDY je historični hold zaradi 3y mediane -50% in SaaS strahu, net-cash, FCF 21.8%, PEG 0.62. DIP velja samo ce score>6.0 + RSI<35 + zelena sveca + VWAP reclaim + vol>1.3x + momentum>0 + ni earnings 5d, sicer NI STROGEGA KANDIDATA. ADBE 4.4/10 ni BEST. Izberi 1 BEST LONG + 1 BEST DIP + 1 AVOID. Za vsakega 3 razlogi s stevilkami P/S PEG WS RSI VWAP volumen earnings. Odgovori v slovenscini z ocenami 1-10."
             clean_key = api_key.strip()
             payload = {"contents": [{"parts": [{"text": prompt_text}]}]}
             success = False
