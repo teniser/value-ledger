@@ -111,6 +111,32 @@ def parse_wallstreet(info, price):
     except Exception:
         return {"ws_score": 5.0, "rec": 0.0, "upside": 0.0, "num": 0}
 
+def get_history_edge(ticker, price_f, fcf, mcap):
+    try:
+        if not price_f:
+            return {"bonus": 0.0, "vs_med": 0.0, "fcf_yield": 0.0}
+        hist = yf.Ticker(ticker).history(period="3y", interval="1wk", auto_adjust=False)
+        vs_med = 0.0
+        bonus = 0.0
+        if hist is not None and len(hist) > 50:
+            closes = hist["Close"].astype(float).dropna()
+            med = float(closes.median())
+            if med > 0:
+                vs_med = (float(price_f) / med - 1) * 100
+                if vs_med < -30: bonus += 1.5
+                elif vs_med < -15: bonus += 1.0
+                elif vs_med < 0: bonus += 0.5
+                elif vs_med > 80: bonus -= 1.0
+        fcf_y = 0.0
+        if fcf and mcap and mcap > 0:
+            fcf_y = float(fcf) / float(mcap) * 100
+            if fcf_y > 5: bonus += 1.0
+            elif fcf_y > 3: bonus += 0.5
+            elif fcf_y < 0: bonus -= 0.5
+        return {"bonus": round(bonus,2), "vs_med": round(vs_med,1), "fcf_yield": round(fcf_y,2)}
+    except Exception:
+        return {"bonus": 0.0, "vs_med": 0.0, "fcf_yield": 0.0}
+
 NY_TZ = pytz.timezone("America/New_York")
 LJ_TZ = pytz.timezone("Europe/Ljubljana")
 
@@ -155,6 +181,9 @@ def get_asymmetry_score(ticker):
     try:
         info = yf.Ticker(ticker).info
         ps = info.get("priceToSalesTrailing12Months") or 20.0
+        # varovalka proti yfinance napaki kot TSM 0.44
+        if float(ps) < 1.0:
+            ps = 20.0
         peg = info.get("pegRatio") or 2.0
         gr = info.get("revenueGrowth") or 0.15
         if isinstance(gr, float) and gr > 1.0:
@@ -165,6 +194,7 @@ def get_asymmetry_score(ticker):
         debt = info.get("totalDebt") or 0.0
         fcf = info.get("freeCashflow") or 0.0
         rev = info.get("totalRevenue") or 0.0
+        mcap = info.get("marketCap") or 0.0
         fcf_m = (fcf / rev * 100) if fcf and rev else 0.0
         net_cash = cash - debt
         s = 5.0
@@ -184,8 +214,10 @@ def get_asymmetry_score(ticker):
         elif fcf_m < 0: s -= 1.0
         ws = parse_wallstreet(info, price_f)
         s = s * 0.7 + ws["ws_score"] * 0.3
+        he = get_history_edge(ticker, price_f, fcf, mcap)
+        s += he["bonus"]
         s = max(0.0, min(10.0, s))
-        return {"score": king_adjusted_score(round(s,1), ticker), "ps": round(float(ps),2), "peg": round(float(peg),2), "growth": round(float(gr)*100,1), "price": round(price_f,2), "net_cash": net_cash, "debt": debt, "ws_score": ws["ws_score"], "ws_rec": ws["rec"], "ws_upside": ws["upside"], "ws_num": ws["num"]}
+        return {"score": king_adjusted_score(round(s,1), ticker), "ps": round(float(ps),2), "peg": round(float(peg),2), "growth": round(float(gr)*100,1), "price": round(price_f,2), "net_cash": net_cash, "debt": debt, "ws_score": ws["ws_score"], "ws_rec": ws["rec"], "ws_upside": ws["upside"], "ws_num": ws["num"], "vs_med": he["vs_med"], "fcf_yield": he["fcf_yield"]}
     except Exception:
         return None
 
@@ -320,11 +352,11 @@ def build_ai_context():
     lines.append("TOP5 LONG:")
     for x in topL:
         s = x["signal"]
-        lines.append("- " + x["ticker"] + " sc " + str(s["score"]) + " P/S " + str(s["ps"]) + " PEG " + str(s["peg"]) + " rast " + str(s["growth"]) + "% WS " + str(s["ws_score"]) + " rec " + str(s["ws_rec"]) + " upside " + str(s["ws_upside"]) + "%")
+        lines.append("- " + x["ticker"] + " sc " + str(s["score"]) + " P/S " + str(s["ps"]) + " PEG " + str(s["peg"]) + " rast " + str(s["growth"]) + "% vs3y " + str(s.get("vs_med")) + "% FCFy " + str(s.get("fcf_yield")) + "% WS " + str(s["ws_score"]))
     lines.append("TOP5 DIP:")
     for x in topR:
         s = x["signal"]
-        lines.append("- " + x["ticker"] + " sc " + str(s["score"]) + " open " + str(s.get("rel_open")) + "% vwap " + str(s.get("rel_vwap")) + "% vol " + str(s.get("vol_ratio")) + "x RSI " + str(s.get("rsi")) + " mom " + str(s.get("momentum")) + "% earn " + str(s.get("earn")))
+        lines.append("- " + x["ticker"] + " sc " + str(s["score"]) + " open " + str(s.get("rel_open")) + "% vwap " + str(s.get("rel_vwap")) + "% vol " + str(s.get("vol_ratio")) + "x RSI " + str(s.get("rsi")))
     return "\n".join(lines)
 
 def get_evening_decision(held_ticker):
