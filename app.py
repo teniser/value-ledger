@@ -274,4 +274,340 @@ def get_atr_levels(ticker, price, mult_stop=1.5, mult_t1=1.5, mult_t2=2.5):
         d = yf.Ticker(ticker).history(period="3mo", interval="1d", auto_adjust=False)
         if d is None or len(d) < 20:
             return None
-        h, l, c = d["High"].astype(float), d["Low"].astype(float), d["Close
+        h, l, c = d["High"].astype(float), d["Low"].astype(float), d["Close"].astype(float)
+        pc = c.shift(1)
+        tr = pd.concat([h-l, (h-pc).abs(), (l-pc).abs()], axis=1).max(axis=1)
+        atr = float(tr.rolling(14).mean().iloc[-1])
+        if not atr or atr != atr:
+            return None
+        return {"atr": round(atr,2), "stop": round(price - atr*mult_stop,2), "t1": round(price + atr*mult_t1,2), "t2": round(price + atr*mult_t2,2)}
+    except Exception:
+        return None
+
+def get_asymmetry_score(ticker):
+    try:
+        info = yf.Ticker(ticker).info
+        ps_raw = info.get("priceToSalesTrailing12Months")
+        if ps_raw is None or float(ps_raw) < 1.0:
+            return {"score": 0.0, "ps": 20.0, "peg": 99.0, "growth": 0.0, "price": 0.0, "net_cash": 0, "debt": 1, "ws_score": 0, "ws_rec": 0, "ws_upside": 0, "ws_num": 0, "vs_med": 0, "fcf_yield": 0, "bad_data": True}
+        ps = float(ps_raw)
+        peg = float(info.get("pegRatio") or 2.0)
+        gr = float(info.get("revenueGrowth") or 0.15)
+        if gr > 1.0:
+            gr = gr / 100.0
+        if gr > 0.40:
+            gr = 0.25
+        price = info.get("currentPrice") or info.get("regularMarketPrice") or 0.0
+        price_f = float(price) if price else 0.0
+        cash = info.get("totalCash") or 0.0
+        debt = info.get("totalDebt") or 0.0
+        fcf = info.get("freeCashflow") or 0.0
+        rev = info.get("totalRevenue") or 0.0
+        mcap = info.get("marketCap") or 0.0
+        fcf_m = (float(fcf) / float(rev) * 100) if fcf and rev else 0.0
+        net_cash = float(cash) - float(debt)
+        s = 5.0
+        if ps < 4: s += 3.0
+        elif ps < 7: s += 2.0
+        elif ps < 12: s += 1.0
+        elif ps > 25: s -= 1.5
+        if peg < 0.9: s += 2.5
+        elif peg < 1.3: s += 1.5
+        elif peg > 3.0: s -= 1.5
+        if gr > 0.25: s += 1.5
+        elif gr > 0.15: s += 0.75
+        if debt == 0 or net_cash > 1000000000: s += 2.0
+        elif net_cash > 0: s += 1.0
+        else: s -= 1.0
+        if fcf_m > 20: s += 1.0
+        elif fcf_m < 0: s -= 1.0
+        ws = parse_wallstreet(info, price_f)
+        s = s * 0.7 + ws["ws_score"] * 0.3
+        he = get_history_edge(ticker, price_f, fcf, mcap)
+        s += he["bonus"]
+        s = max(0.0, min(10.0, s))
+        return {"score": king_adjusted_score(round(s,1), ticker), "ps": round(float(ps),2), "peg": round(float(peg),2), "growth": round(float(gr)*100,1), "price": round(price_f,2), "net_cash": net_cash, "debt": debt, "ws_score": ws["ws_score"], "ws_rec": ws["rec"], "ws_upside": ws["upside"], "ws_num": ws["num"], "vs_med": he["vs_med"], "fcf_yield": he["fcf_yield"], "bad_data": False}
+    except Exception:
+        return None
+
+def get_liquidity_ok(ticker):
+    try:
+        info = yf.Ticker(ticker).info
+        mcap = info.get("marketCap") or 0
+        avgv = info.get("averageVolume") or 0
+        price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+        if mcap < 2000000000:
+            return False
+        if avgv and price and (float(avgv) * float(price) < 20000000):
+            return False
+        return True
+    except Exception:
+        return True
+
+@st.cache_data(ttl=1800)
+def scan_best_long():
+    best = None
+    for t in AI_UNIVERSE:
+        r = get_asymmetry_score(t)
+        if r is None or r.get("bad_data"):
+            continue
+        if r["ps"] > 20 or r["peg"] > 2.8 or r["growth"] < 12:
+            continue
+        if r["debt"] > 0 and r["net_cash"] < 0:
+            continue
+        if not get_liquidity_ok(t):
+            continue
+        if r["score"] < 6.5:
+            continue
+        if best is None or r["score"] > best["signal"]["score"]:
+            best = {"ticker": t, "signal": r}
+    if best is not None:
+        log_king_score("LONG", best["ticker"], best["signal"]["score"], f'PS{best["signal"]["ps"]}')
+    return best
+
+@st.cache_data(ttl=600)
+def scan_best_reversal():
+    best = None
+    for t in AI_UNIVERSE:
+        df = get_intraday_df(t)
+        sig = tactical_intraday_signal(df)
+        if sig is None or df is None:
+            continue
+        sig["score"] = king_adjusted_score(sig["score"], t)
+        if not (-8.0 <= sig.get("rel_open", 0) <= -1.0):
+            continue
+        if sig.get("rel_vwap", 0) < -2.0:
+            continue
+        if sig.get("vol_ratio", 0) < 1.3:
+            continue
+        if sig.get("momentum", 0) < 0:
+            continue
+        if get_rsi_5m(df) > 35:
+            continue
+        if not is_green_reclaim(df):
+            continue
+        if has_earnings_soon(t, 5):
+            continue
+        if sig["score"] < 6.0:
+            continue
+        if best is None or sig["score"] > best["signal"]["score"]:
+            best = {"ticker": t, "signal": sig}
+    if best is not None:
+        log_king_score("REVERSAL", best["ticker"], best["signal"]["score"])
+    return best
+
+@st.cache_data(ttl=1800)
+def scan_top_long(n=5):
+    out = []
+    for t in AI_UNIVERSE:
+        r = get_asymmetry_score(t)
+        if r is None or r.get("bad_data"):
+            continue
+        if r["ps"] > 20 or r["peg"] > 2.8 or r["growth"] < 12:
+            continue
+        if r["debt"] > 0 and r["net_cash"] < 0:
+            continue
+        if not get_liquidity_ok(t):
+            continue
+        out.append((t, r))
+    out.sort(key=lambda x: x[1]["score"], reverse=True)
+    return [{"ticker": t, "signal": r} for t, r in out[:n]]
+
+@st.cache_data(ttl=600)
+def scan_top_reversal(n=5):
+    out = []
+    for t in AI_UNIVERSE:
+        df = get_intraday_df(t)
+        sig = tactical_intraday_signal(df)
+        if sig is None or df is None:
+            continue
+        sig["score"] = king_adjusted_score(sig["score"], t)
+        rsi = get_rsi_5m(df)
+        earn = has_earnings_soon(t, 5)
+        sig["rsi"] = round(rsi,1)
+        sig["earn"] = earn
+        if not (-8.0 <= sig.get("rel_open", 0) <= -1.0):
+            continue
+        if sig.get("rel_vwap", 0) < -2.0:
+            continue
+        if sig.get("vol_ratio", 0) < 1.3:
+            continue
+        if sig.get("momentum", 0) < 0:
+            continue
+        if rsi > 35:
+            continue
+        if not is_green_reclaim(df):
+            continue
+        if earn:
+            continue
+        if sig["score"] < 6.0:
+            continue
+        out.append((t, sig))
+    out.sort(key=lambda x: x[1]["score"], reverse=True)
+    return [{"ticker": t, "signal": s} for t, s in out[:n]]
+
+def build_ai_context():
+    topL = scan_top_long(5)
+    topR = scan_top_reversal(5)
+    lines = []
+    lines.append("MAKRO TRG: " + str(market["regime"]) + " SPY20d " + str(market["spy_chg"]) + "%")
+    
+    lines.append("SEKTORSKI SENTIMENT (Kapitalska rotacija):")
+    for sec, dat in sector_sentiment.items():
+        lines.append(f"- {sec}: {dat}")
+        
+    lines.append("TOP5 LONG:")
+    for x in topL:
+        s = x["signal"]
+        lines.append("- " + x["ticker"] + " sc " + str(s["score"]) + " P/S " + str(s["ps"]) + " PEG " + str(s["peg"]) + " rast " + str(s["growth"]) + "% vs3y " + str(s.get("vs_med")) + "% FCFy " + str(s.get("fcf_yield")) + "% WS " + str(s["ws_score"]))
+    lines.append("TOP5 DIP:")
+    for x in topR:
+        s = x["signal"]
+        lines.append("- " + x["ticker"] + " sc " + str(s["score"]) + " open " + str(s.get("rel_open")) + "% vwap " + str(s.get("rel_vwap")) + "% vol " + str(s.get("vol_ratio")) + "x RSI " + str(s.get("rsi")))
+    if not topR:
+        lines.append("- NI STROGEGA KANDIDATA (vsi padejo na RSI/vol/momentum/green/earnings)")
+    return "\n".join(lines)
+
+def get_evening_decision(held_ticker):
+    held_sig = tactical_intraday_signal(get_intraday_df(held_ticker))
+    if held_sig is None:
+        return {"action": "NI PODATKOV", "best": None, "held": None}
+    held_sig["score"] = king_adjusted_score(held_sig["score"], held_ticker)
+    if held_sig["score"] >= 7.0:
+        action = "DRZI CEZ NOC"
+    elif held_sig["score"] >= 6.0:
+        action = "DELNO ZMANJSAJ / OPREZ"
+    else:
+        action = "PRODAJ PRED ZAPRTJEM"
+    return {"action": action, "best": None, "held": held_sig}
+
+def is_preclose_window(now_ny=None):
+    if now_ny is None:
+        now_ny = datetime.now(NY_TZ)
+    if now_ny.weekday() >= 5:
+        return False
+    return time(15,30) <= now_ny.time() < time(16,0)
+
+lj_time = datetime.now(LJ_TZ).strftime("%d.%m.%Y %H:%M CET")
+st.markdown('<div style="border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:14px;margin-bottom:20px;"><h1 style="margin:0;font-size:1.8rem;"><span style="color:#F59E0B;">THE VALUE LEDGER</span> <span style="color:#60A5FA;">2.0</span></h1><p style="color:#94A3B8;font-size:0.82rem;">Kvantitativni Terminal ' + lj_time + '</p></div>', unsafe_allow_html=True)
+
+st.sidebar.markdown("### Vecerni takticni pregled")
+tick_list = list(TICKERS_CONFIG.keys())
+held_ticker = st.sidebar.selectbox("Katera delnica je v poziciji?", options=tick_list, index=tick_list.index("CRWD"))
+st.sidebar.markdown("**Trg:** " + str(market["regime"]) + " (SPY 20d: " + str(market["spy_chg"]) + "%)")
+
+# Izpis Sektorskega Sentimenta v sidebar
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Rotacija Sektorjev:**")
+for sec, val in sector_sentiment.items():
+    col = "#10B981" if "BULL" in val else "#EF4444"
+    st.sidebar.markdown(f"<span style='font-size:0.8rem;'>{sec}: <span style='color:{col};'>{val}</span></span>", unsafe_allow_html=True)
+
+if market["regime"] == "RISK-OFF":
+    st.sidebar.warning("RISK-OFF: zmanjsaj velikost pozicije, A+ samo izjemoma.")
+
+bestL = scan_best_long()
+bestR = scan_best_reversal()
+if bestL is not None:
+    l_txt = str(bestL["ticker"]) + " " + str(bestL["signal"]["score"]) + "/10 P/S " + str(bestL["signal"]["ps"]) + " PEG " + str(bestL["signal"]["peg"])
+    lv = get_atr_levels(bestL["ticker"], bestL["signal"]["price"])
+    if lv:
+        l_txt += f' | ATR {lv["atr"]} STOP {lv["stop"]} T1 {lv["t1"]} T2 {lv["t2"]}'
+else:
+    l_txt = "NI STROGEGA KANDIDATA"
+if bestR is not None:
+    r_txt = str(bestR["ticker"]) + " " + str(bestR["signal"]["score"]) + "/10"
+else:
+    r_txt = "NI STROGEGA KANDIDATA"
+
+evening = get_evening_decision(held_ticker)
+if is_preclose_window() and evening["held"] is not None:
+    act = evening["action"]
+    col = "#10B981" if act == "DRZI CEZ NOC" else ("#F59E0B" if act == "DELNO ZMANJSAJ / OPREZ" else "#EF4444")
+    st.markdown('<div class="ledger-card"><div style="font-weight:700;">Vecerni pregled ' + str(held_ticker) + ': <span style="color:' + col + ';">' + act + '</span></div></div>', unsafe_allow_html=True)
+
+m = data.get("MNDY", {"price": 106.86, "chg": 0.0, "ps": 3.3})
+st.markdown('<div class="mndy-hero-card"><span style="font-size:1.35rem;font-weight:700;color:#FFFFFF;">MNDY</span> <span class="badge-sector">SaaS</span><div style="font-size:1.7rem;color:#fff;">$' + str(m["price"]) + '</div><div style="color:#F59E0B;">Ocena Asimetrije: 9.4 / 10 | SaaS strah = popust</div></div>', unsafe_allow_html=True)
+
+c = data.get("CRWD", {"price": 325.0, "chg": 0.0, "ps": 17.0})
+st.markdown('<div class="ledger-card"><span style="font-size:1.25rem;font-weight:700;color:#FFFFFF;">CRWD</span> <span class="aplus-badge">A+ SETUP</span><div style="font-size:1.55rem;color:#fff;">$' + str(c["price"]) + '</div></div>', unsafe_allow_html=True)
+
+topL = scan_top_long(5)
+topR = scan_top_reversal(5)
+
+colL, colR = st.columns(2)
+with colL:
+    st.markdown("### King TOP5 Long - asimetrija")
+    rowsL = []
+    for x in topL:
+        s = x["signal"]
+        lv = get_atr_levels(x["ticker"], s["price"])
+        rowsL.append({"Ticker": x["ticker"], "Cena": s["price"], "Score": s["score"], "P/S": s["ps"], "PEG": s["peg"], "vs3y%": s.get("vs_med"), "FCFy%": s.get("fcf_yield"), "WS": s.get("ws_score"), "STOP": lv["stop"] if lv else None, "T1": lv["t1"] if lv else None})
+    if rowsL:
+        st.dataframe(pd.DataFrame(rowsL).sort_values(by="Score", ascending=False), use_container_width=True, hide_index=True)
+    else:
+        st.info("NI STROGEGA KANDIDATA")
+
+with colR:
+    st.markdown("### King TOP5 Dip - tik pred obratom")
+    rowsR = []
+    for x in topR:
+        s = x["signal"]
+        rowsR.append({"Ticker": x["ticker"], "Score": s["score"], "open%": s.get("rel_open"), "vwap%": s.get("rel_vwap"), "volx": s.get("vol_ratio"), "RSI": s.get("rsi"), "mom%": s.get("momentum")})
+    if rowsR:
+        st.dataframe(pd.DataFrame(rowsR).sort_values(by="Score", ascending=False), use_container_width=True, hide_index=True)
+    else:
+        st.info("NI STROGEGA KANDIDATA - cakaj kot CRWD setup")
+
+col_rot, col_exit = st.columns(2)
+with col_rot:
+    st.markdown('<div class="ledger-card"><h4 style="color:#10B981;">Capital Rotation Radar</h4><p style="font-size:0.82rem;color:#94A3B8;">Trg: ' + str(market["regime"]) + '</p><div style="font-size:0.82rem;color:#6EE7B7;">BEST LONG: ' + l_txt + '<br>BEST OBRAT: ' + r_txt + '</div></div>', unsafe_allow_html=True)
+with col_exit:
+    st.markdown('<div class="ledger-card"><h4 style="color:#F59E0B;">MNDY Stopnje</h4><div style="font-size:0.82rem;color:#CBD5E1;">1. Tarca 220-240: prodaj 20-25%.<br>2. Tarca 280-310: prodaj 50%.<br>3. Tarca nad 340: popolna prodaja.</div></div>', unsafe_allow_html=True)
+
+st.markdown("---")
+st.markdown("<h3>Avtonomni AI Analitik</h3>", unsafe_allow_html=True)
+if st.button("POZENI AVTONOMNI AI PREGLED TRGA"):
+    if not api_key:
+        st.error("Vnesite Gemini API kljuc.")
+    else:
+        with st.spinner("Povezovanje z Gemini AI..."):
+            ctx = build_ai_context()
+            prompt_text = "Ti si analitik Value Ledger 2.0 KING.\n" + ctx + "\nCene10: " + str(data) + "\nPRAVILA: Upotevaj sektorski sentiment za trend denarja. TSM in vsak ticker z bad_data ali FCFy>15% ali P/S fallback 20.0 IGNORIRAJ kot pokvarjen podatek. MNDY je historicni hold zaradi 3y mediane -50% in SaaS strahu, net-cash, FCF 21.8%, PEG 0.62. DIP velja samo ce score>6.0 + RSI<35 + zelena sveca + VWAP reclaim + vol>1.3x + momentum>0 + ni earnings 5d, sicer napisi NI STROGEGA KANDIDATA. ADBE 4.4/10 ni BEST. Izberi 1 BEST LONG + 1 BEST DIP + 1 AVOID. Za vsakega 3 razlogi s stevilkami P/S PEG WS RSI VWAP volumen earnings. Odgovori v slovenscini z ocenami 1-10."
+            clean_key = api_key.strip()
+            payload = {"contents": [{"parts": [{"text": prompt_text}]}]}
+            success = False
+            last_error = ""
+            try:
+                l_res = requests.get("https://generativelanguage.googleapis.com/v1beta/models?key=" + clean_key, timeout=15)
+                if l_res.status_code == 200:
+                    all_m = l_res.json().get("models", [])
+                    models_to_try = [mm["name"].split("/")[-1] for mm in all_m if "generateContent" in mm.get("supportedGenerationMethods", [])]
+                else:
+                    models_to_try = []
+                    last_error = "ListModels: " + str(l_res.status_code)
+            except Exception as e:
+                models_to_try = []
+                last_error = str(e)
+            if not models_to_try:
+                models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
+            st.caption("Najdeni modeli: " + ", ".join(models_to_try[:5]))
+            for mname in models_to_try:
+                try:
+                    url = "https://generativelanguage.googleapis.com/v1beta/models/" + mname + ":generateContent?key=" + clean_key
+                    res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=25)
+                    if res.status_code == 200:
+                        st.session_state["ai_report"] = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                        st.session_state["used_model"] = mname
+                        success = True
+                        break
+                    else:
+                        last_error = mname + ": " + str(res.status_code) + " " + res.text[:300]
+                except Exception as e:
+                    last_error = str(e)
+                    continue
+            if not success:
+                st.error("Zadnja napaka: " + last_error)
+if "ai_report" in st.session_state:
+    rep = st.session_state["ai_report"].replace("\n", "<br>")
+    st.markdown('<div class="ledger-card"><h3>Porocilo AI (' + st.session_state.get("used_model", "Gemini") + ')</h3><div>' + rep + '</div></div>', unsafe_allow_html=True)
