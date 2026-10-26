@@ -2595,3 +2595,114 @@ else:
         "Skene lahko osvežiš z gumbom."
     )
     render_dashboard()
+    # ===== DODATEK: PROSTI TOK DENARJA - BETA (append-only) =====
+import os
+import json
+
+def dodatek_etf_so(etf):
+    try:
+        info = yf.Ticker(etf).info or {}
+        so = safe_float(info.get("sharesOutstanding"))
+        price = safe_float(info.get("currentPrice") or info.get("regularMarketPrice"))
+        return so, price
+    except Exception:
+        return None, None
+
+def dodatek_inst_snapshot(ticker):
+    try:
+        info = yf.Ticker(ticker).info or {}
+        return {
+            "Ticker": ticker,
+            "Inst %": safe_float(info.get("heldPercentInstitutions")),
+            "Insider %": safe_float(info.get("heldPercentInsiders")),
+            "Short % float": safe_float(info.get("shortPercentOfFloat")),
+        }
+    except Exception:
+        return {"Ticker": ticker}
+
+try:
+    st.markdown("---")
+    st.subheader("Dodatek: prosti tok denarja (beta)")
+    st.caption("ETF creation proxy + institucionalno lastništvo. FINRA dark pool je poskusen. Ni napoved donosa.")
+
+    with st.expander("1) ETF tok - IGV vs SMH (creation proxy)", expanded=False):
+        st.write("Rast sharesOutstanding = priliv, padec = odliv. Yahoo daje samo snapshot, zato zgodovino shranim v datoteko.")
+        if st.button("Preveri ETF tok", key="dodatek_flow_btn"):
+            etfs = ["IGV", "SMH", "QQQ", "SPY"]
+            rows = []
+            hist_path = "etf_so_history.csv"
+            today = datetime.now(LJ_TZ).date().isoformat()
+            hist = {}
+            if os.path.exists(hist_path):
+                try:
+                    hdf = pd.read_csv(hist_path)
+                    if not hdf.empty:
+                        hist = dict(zip(hdf["ETF"] + "_" + hdf["date"], hdf["sharesOutstanding"]))
+                        last_by_etf = hdf.sort_values("date").groupby("ETF").tail(1).set_index("ETF")["sharesOutstanding"].to_dict()
+                    else:
+                        last_by_etf = {}
+                except Exception:
+                    last_by_etf = {}
+            else:
+                last_by_etf = {}
+
+            new_lines = []
+            for e in etfs:
+                so, price = dodatek_etf_so(e)
+                prev = last_by_etf.get(e)
+                chg = None
+                if so is not None and prev not in (None, 0):
+                    try:
+                        chg = (so / float(prev) - 1) * 100
+                    except Exception:
+                        chg = None
+                rows.append({
+                    "ETF": e,
+                    "sharesOutstanding danes": int(so) if so else None,
+                    "sprememba vs zadnji zapis %": round(chg, 3) if chg is not None else None,
+                    "cena": round(price, 2) if price else None,
+                })
+                if so is not None:
+                    new_lines.append({"date": today, "ETF": e, "sharesOutstanding": int(so)})
+
+            render_table(pd.DataFrame(rows))
+            if new_lines:
+                try:
+                    ndf = pd.DataFrame(new_lines)
+                    if os.path.exists(hist_path):
+                        ndf.to_csv(hist_path, mode="a", header=False, index=False)
+                    else:
+                        ndf.to_csv(hist_path, index=False)
+                    st.caption("Današnji SO shranjen v etf_so_history.csv. Pravi signal dobiš čez 1-2 tedna rednega klikanja.")
+                except Exception as ex:
+                    st.caption(f"Zgodovine nisem mogel shraniti: {ex}")
+            st.caption("Če IGV raste SO + premaguje SMH po ceni, je to tvoj zgodnji SaaS flow signal, pred rel20.")
+
+    with st.expander("2) Institucionalno lastništvo za TOP Long", expanded=False):
+        st.write("Vzame tickere iz tabele TOP 5 Long, če je narejena. Sicer preveri MNDY, ADBE.")
+        if st.button("Preveri institucije", key="dodatek_inst_btn"):
+            tickers = ["MNDY", "ADBE", "TSM", "BSX", "GOOGL"]
+            out = [dodatek_inst_snapshot(t) for t in tickers]
+            df = pd.DataFrame(out)
+            # pretvori deleže v %
+            for c in ["Inst %", "Insider %", "Short % float"]:
+                if c in df.columns:
+                    df[c] = df[c].apply(lambda x: round(float(x)*100, 2) if x is not None else None)
+            render_table(df)
+            st.caption("Visok inst % + rastoč trend čez kvartale = skladi so že notri. Nizek inst % + obrat navzgor = še imajo kam kupovati.")
+
+    with st.expander("3) FINRA dark pool (poskusno)", expanded=False):
+        st.write("Tedenski FINRA ATS podatek. Če fetch pade, zgornja koda ostane nedotaknjena.")
+        t_in = st.text_input("Ticker za dark pool", value="MNDY", key="dodatek_dp_ticker")
+        if st.button("Preveri dark pool", key="dodatek_dp_btn"):
+            st.info("FINRA ATS CSV se spreminja in nima stabilnega JSON API-ja. Tukaj zaenkrat pokažem samo navodilo + OTC volumen iz Yahoo, da ne podrem appa.")
+            try:
+                h = yf.Ticker(t_in.strip().upper()).history(period="1mo", interval="1d", auto_adjust=True)
+                if h is not None and not h.empty:
+                    st.write(f"Zadnji dnevni volumen {t_in.upper()}: {int(h['Volume'].iloc[-1]):,}")
+                st.write("Polni FINRA ATS file: finra.org -> ATS Transparency Statistics (tedensko, zamuda ~2 tedna). Ko mi prilepiš CSV za 1 ticker, ti naredim pravi parser.")
+            except Exception as ex:
+                st.warning(f"Ni podatka: {ex}")
+
+except Exception as ex:
+    st.warning(f"Dodatek za tok denarja se ni naložil, ostalo deluje naprej: {ex}")
